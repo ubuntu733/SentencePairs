@@ -1,0 +1,8 @@
+*.pyc
+data/models/
+data/summary/
+data/vocab/
+data/results/
+.idea/
+__pycache__/
+venv/

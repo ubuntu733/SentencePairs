@@ -6,3 +6,4 @@ data/results/
 .idea/
 __pycache__/
 venv/
+data/log*

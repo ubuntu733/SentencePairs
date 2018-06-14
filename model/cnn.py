@@ -18,6 +18,8 @@
 import tensorflow as tf
 import tensorflow.contrib as tc
 from .layer import conv
+
+
 class CNN(object):
 
     def __init__(self, doc1, doc2, args):
@@ -26,7 +28,7 @@ class CNN(object):
         self.args = args
 
     def build_graph(self):
-        with tf.variable_scope('encode_conv'):
+        with tf.variable_scope("encode_conv"):
             document1_pooled_outputs = []
             document2_pooled_outputs = []
 
@@ -36,24 +38,35 @@ class CNN(object):
                         inputs=self.doc1,
                         output_size=self.args.hidden_size,
                         activation=tf.nn.relu,
-                        name='conv-%s' % filter_size,
+                        name="conv-%s" % filter_size,
                         kernel_size=filter_size,
-                        reuse=None
+                        reuse=None,
                     )
                     document2_conv = conv(
                         inputs=self.doc2,
                         output_size=self.args.hidden_size,
                         activation=tf.nn.relu,
-                        name='conv-%s' % filter_size,
+                        name="conv-%s" % filter_size,
                         kernel_size=filter_size,
-                        reuse=True
+                        reuse=True,
                     )
 
-
-                    document1_conv = tf.reshape(document1_conv, [-1, (
-                                self.args.max_document_len - filter_size + 1) * self.args.hidden_size])
-                    document2_conv = tf.reshape(document2_conv, [-1, (
-                            self.args.max_document_len - filter_size + 1) * self.args.hidden_size])
+                    document1_conv = tf.reshape(
+                        document1_conv,
+                        [
+                            -1,
+                            (self.args.max_document_len - filter_size + 1)
+                            * self.args.hidden_size,
+                        ],
+                    )
+                    document2_conv = tf.reshape(
+                        document2_conv,
+                        [
+                            -1,
+                            (self.args.max_document_len - filter_size + 1)
+                            * self.args.hidden_size,
+                        ],
+                    )
                     document1_pooled_outputs.append(document1_conv)
                     document2_pooled_outputs.append(document2_conv)
             self.document1_pool = tf.concat(document1_pooled_outputs, 1)
@@ -63,14 +76,22 @@ class CNN(object):
             if self.args.dropout > 0:
                 with tf.name_scope("encode_dropout"):
                     self.document1_drop = tf.nn.dropout(
-                        self.document1_pool, 1 - self.args.dropout)
+                        self.document1_pool, 1 - self.args.dropout
+                    )
                     self.document2_drop = tf.nn.dropout(
-                        self.document2_pool, 1 - self.args.dropout)
+                        self.document2_pool, 1 - self.args.dropout
+                    )
             else:
                 self.document1_drop = self.document1_pool
                 self.document2_drop = self.document2_pool
             self.document1_represent = tc.layers.fully_connected(
-                inputs=self.document1_drop, num_outputs=self.args.hidden_size, activation_fn=tf.nn.tanh)
+                inputs=self.document1_drop,
+                num_outputs=self.args.hidden_size,
+                activation_fn=tf.nn.tanh,
+            )
             self.document2_represent = tc.layers.fully_connected(
-                inputs=self.document2_drop, num_outputs=self.args.hidden_size, activation_fn=tf.nn.tanh)
+                inputs=self.document2_drop,
+                num_outputs=self.args.hidden_size,
+                activation_fn=tf.nn.tanh,
+            )
         return self.document1_represent, self.document2_represent

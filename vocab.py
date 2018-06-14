@@ -33,8 +33,8 @@ class Vocab(object):
         self.embedding_dim = None
         self.embedding = None
 
-        self.pad_token = '<blank>'
-        self.unk_token = '<unk>'
+        self.pad_token = "<blank>"
+        self.unk_token = "<unk>"
 
         self.initial_tokens = initial_tokens if initial_tokens is not None else []
         self.initial_tokens.extend([self.pad_token, self.unk_token])
@@ -104,9 +104,9 @@ class Vocab(object):
         Args:
             file_path: a file with a word in each line
         """
-        for line in open(file_path, 'r'):
-            line = unicode(line, encoding='utf8')
-            token = line.rstrip('\n')
+        for line in open(file_path, "r"):
+            line = unicode(line, encoding="utf8")
+            token = line.rstrip("\n")
             self.add(token)
 
     def load_pretrained_from_file(self, file_path, embedding_size):
@@ -118,16 +118,15 @@ class Vocab(object):
         self.embedding_size = embedding_size
         vector = []
         words = []
-        for line in open(file_path, 'r'):
-            line = unicode(line, encoding='utf8')
-            line_list  = line.strip('\n').split( )
+        for line in open(file_path, "r"):
+            line = unicode(line, encoding="utf8")
+            line_list = line.strip("\n").split()
             self.add(line_list[0])
             words.append(line_list[0])
             vector.append(line_list[1:-1])
         self.embedding = np.zeros(self.size(), embedding_size)
-        for index,word in enumerate(words):
+        for index, word in enumerate(words):
             self.embedding[self.get_id(word)] = np.array(vector[index])
-
 
     def filter_word_by_count(self, min_count):
         """
@@ -136,7 +135,8 @@ class Vocab(object):
             min_count: an integer
         """
         filter_token = [
-            token for token in self.token2id if self.token_count[token] >= min_count]
+            token for token in self.token2id if self.token_count[token] >= min_count
+        ]
         self.token2id = {}
         self.id2token = {}
         for token in self.initial_tokens:
@@ -168,7 +168,7 @@ class Vocab(object):
             if max_length < len(tokens):
                 vec = vec[0:max_length]
             else:
-                for i in range(max_length-len(tokens)):
+                for i in range(max_length - len(tokens)):
                     vec += [self.token2id[self.pad_token]]
         return vec
 
@@ -181,14 +181,16 @@ class Vocab(object):
             if max_length < len(words):
                 words = words[0:max_length]
             else:
-                for i in range(max_length-len(words)):
-                    words.append([self.get_id(self.pad_token) for i in range(max_word_length)])
+                for i in range(max_length - len(words)):
+                    words.append(
+                        [self.get_id(self.pad_token) for i in range(max_word_length)]
+                    )
         if max_word_length:
-            for idx,word in enumerate(words):
+            for idx, word in enumerate(words):
                 if max_word_length < len(word):
                     words[idx] = word[0:max_word_length]
                 else:
-                    for i in range(max_word_length-len(word)):
+                    for i in range(max_word_length - len(word)):
                         word += [self.token2id[self.pad_token]]
         return words
 
@@ -207,4 +209,3 @@ class Vocab(object):
             if stop_id is not None and i == stop_id:
                 break
         return tokens
-

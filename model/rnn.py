@@ -17,6 +17,8 @@
 
 from .layer import rnn
 import tensorflow as tf
+
+
 class RNN(object):
 
     def __init__(self, doc1, doc2, args):
@@ -26,19 +28,21 @@ class RNN(object):
 
     def build_graph(self):
         self.document1_encode, _ = rnn(
-            rnn_type='bi-lstm',
-            scope='document_encode',
+            rnn_type="bi-lstm",
+            scope="document_encode",
             inputs=self.doc1,
             length=None,
             hidden_size=self.args.hidden_size,
-            reuse=None)
+            reuse=None,
+        )
         self.document2_encode, _ = rnn(
-            rnn_type='bi-lstm',
+            rnn_type="bi-lstm",
             inputs=self.doc2,
-            scope='document_encode',
+            scope="document_encode",
             length=None,
             hidden_size=self.args.hidden_size,
-            reuse=True)
+            reuse=True,
+        )
         self.doc1 = tf.reduce_max(self.document1_encode, axis=1)
         self.doc2 = tf.reduce_max(self.document2_encode, axis=1)
         return self.doc1, self.doc2

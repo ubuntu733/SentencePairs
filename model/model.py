@@ -321,7 +321,7 @@ class Model(object):
               evaluate: Whether to evaluate the model on test set after each epoch
               character: Whether nor not to use character feature
         """
-        max_accuracy = 0.0
+        max_f1score = 0.0
         for epoch in range(1, epochs + 1):
             self.logger.info("Training the model for epoch {}".format(epoch))
 
@@ -359,6 +359,7 @@ class Model(object):
                         batch_size=batch_size, set_name="dev"
                     )
                     loss_, accuracy_, predicts, labels = self.evaluate(dev_batches)
+                    f1score = metrics.f1_score(np.argmax(labels, axis=1), np.array(predicts))
                     self.logger.info("Dev eval loss {}".format(loss_))
                     self.logger.info("Dev eval accuracy {}".format(accuracy_))
                     self.logger.info(
@@ -382,8 +383,8 @@ class Model(object):
                             )
                         )
                     )
-                    if accuracy_ > max_accuracy:
-                        max_accuracy = accuracy_
+                    if f1score >= max_f1score:
+                        max_f1score = f1score
                         self.save(save_dir, save_prefix)
             else:
                 self.save(save_dir, save_prefix)
@@ -458,6 +459,58 @@ class Model(object):
             labels,
         )
 
+    def predictiton(
+            self, batch_data, result_file, save_predict_label=False
+    ):
+        """
+        Evaluate the model with data
+        Args:
+            batch_data: iterable batch data
+            result_dir: the director to save the predict answers ,
+                        answers will not save if None
+            result_prefix: the prefix of file for saving the predict answers,
+                           answers will not save if None
+            save_predict_label: if True, the pred_answers will be added to raw sample and saved
+            character: use character feature
+        """
+        if save_predict_label:
+            result = []
+        index = 0
+        predicts = []
+        for idx, batch in enumerate(batch_data):
+            feed_dict = {
+                self.document1: batch["document1_ids"],
+                self.document2: batch["document2_ids"],
+                self.document1_character: batch["document1_character_ids"],
+                self.document2_character: batch["document2_character_ids"],
+            }
+
+            predict = self.sess.run(
+                [self.predict], feed_dict
+            )
+            index += 1
+            predict = predict[0]
+            predicts.extend(predict.tolist())
+
+            if save_predict_label:
+                for idx, sample in enumerate(batch["raw_data"]):
+                    result.append(
+                        {
+                            "id": sample["id"],
+                           # "document1": "".join(sample["document1"]),
+                           # "document2": "".join(sample["document2"]),
+                            "predict": predict[idx],
+                        }
+                    )
+
+        if save_predict_label:
+            self.logger.info("Write predict label to {}".format(result_file))
+            with open(result_file, "w") as fout:
+                for tmp in result:
+                    fout.write(self._json_2_string(tmp, predict=True) + "\n")
+
+        return predicts,
+
     def save(self, model_dir, model_prefix):
         """
         Saves the model into model_dir with model_prefix as the model indicator
@@ -476,8 +529,11 @@ class Model(object):
             "Model restored from {}, with prefix {}".format(model_dir, model_prefix)
         )
 
-    def _json_2_string(self, json_obj):
-        s = (
+    def _json_2_string(self, json_obj, predict=False):
+        if predict:
+            s = json_obj['id'] + '\t' + str(json_obj['predict'])
+        else:
+            s = (
             json_obj["id"]
             + "\t"
             + json_obj["document1"]
@@ -485,7 +541,5 @@ class Model(object):
             + json_obj["document2"]
             + "\t"
             + str(json_obj["predict"])
-            + "\t"
-            + str(json_obj["label"])
-        )
+            )
         return s

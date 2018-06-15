@@ -1,0 +1,1 @@
+python eval.py --predict --test_file $1 --class_model rnn --result_file $2

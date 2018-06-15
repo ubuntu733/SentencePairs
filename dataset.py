@@ -37,9 +37,11 @@ class Dataset(object):
     def __init__(self, args):
         self.logger = logging.getLogger("alibaba")
         self.args = args
-
-        self.data_sets = self._load_dataset(args.preposs_file)
-        self.train_set, self.dev_set = self._shuffle_and_split_data_set(self.data_sets)
+        if self.args.predict:
+            self.test_sets = self._load_test_dataset(args.preposs_file)
+        else:
+            self.data_sets = self._load_dataset(args.preposs_file)
+            self.train_set, self.dev_set = self._shuffle_and_split_data_set(self.data_sets)
 
     def _load_dataset(self, data_path):
         """
@@ -76,6 +78,39 @@ class Dataset(object):
 
         return data_set
 
+    def _load_test_dataset(self, data_path):
+        """
+        Loads the dataset
+        Args:
+            data_path: the data file to load
+        """
+        with open(data_path, "r") as fin:
+            data_set = []
+            for idx, line in enumerate(fin):
+                line = unicode(line, encoding="utf8")
+                sample = {}
+                line_list = str(line).strip().split("|")
+                if len(line_list) != 3:
+                    self.logger.warning("第{}行数据格式错误".format(idx + 1))
+                    continue
+                else:
+                    sample["id"] = line_list[0]
+                    sample["document1"] = [
+                        unicode(_, "utf8") for _ in line_list[1].split(" ")
+                    ]
+                    sample["document1_character"] = self._add_character(
+                        line_list[1].split(" ")
+                    )
+                    sample["document2"] = [
+                        unicode(_, "utf8") for _ in line_list[2].split(" ")
+                    ]
+                    sample["document2_character"] = self._add_character(
+                        line_list[2].split(" ")
+                    )
+                data_set.append(sample)
+            self.logger.info("DataSet size {} sample".format(len(data_set)))
+
+        return data_set
     def _add_character(self, word_list):
         """
         Add the characters
@@ -107,12 +142,14 @@ class Dataset(object):
             dev_set.append(data_set[idx])
         return train_set, dev_set
 
-    def get_mini_batchs(self, batch_size, set_name="train", shuffle=False):
+    def get_mini_batchs(self, batch_size, set_name="train", shuffle=False, predict=False):
         # self.train_set, self.dev_set = self._shuffle_and_split_data_set(self.data_sets)
         if set_name == "train":
             data_set = self.train_set
         elif set_name == "dev":
             data_set = self.dev_set
+        elif set_name == 'test':
+            data_set = self.test_sets
         else:
             raise NotImplementedError("No data set named as {}".format(set_name))
         data_size = len(data_set)
@@ -121,9 +158,9 @@ class Dataset(object):
             np.random.shuffle(indices)
         for batch_start in np.arange(0, data_size, batch_size):
             batch_indices = indices[batch_start : batch_start + batch_size]
-            yield self._one_mini_batch(data_set, batch_indices)
+            yield self._one_mini_batch(data_set, batch_indices, predict=predict)
 
-    def _one_mini_batch(self, data, batch_indices):
+    def _one_mini_batch(self, data, batch_indices, predict=False):
         """
         Get one mini batch
         Args:
@@ -132,7 +169,17 @@ class Dataset(object):
         Returns:
             one batch of data
         """
-        batch_data = {
+        if predict:
+            batch_data = {
+                "raw_data": [data[i] for i in batch_indices],
+                "document1_ids": [],
+                "document2_ids": [],
+                "document1_character_ids": [],
+                "document2_character_ids": [],
+                "id": [],
+            }
+        else:
+            batch_data = {
             "raw_data": [data[i] for i in batch_indices],
             "document1_ids": [],
             "document2_ids": [],
@@ -140,7 +187,7 @@ class Dataset(object):
             "document2_character_ids": [],
             "label": [],
             "id": [],
-        }
+            }
         for data in batch_data["raw_data"]:
             try:
                 batch_data["document1_ids"].append(data["document1_ids"])
@@ -151,8 +198,11 @@ class Dataset(object):
                 batch_data["document2_character_ids"].append(
                     data["document2_character_ids"]
                 )
-                batch_data["label"].append(data["label"])
                 batch_data["id"].append(data["id"])
+                if predict:
+                    continue
+                batch_data["label"].append(data["label"])
+
             except KeyError:
                 print(" ")
         return batch_data
@@ -188,13 +238,18 @@ class Dataset(object):
                     for token in sample["document2"]:
                         yield token
 
-    def convert_to_ids(self, vocab, character=False):
+    def convert_to_ids(self, vocab, character=False, set_name=None):
         """
         Convert the question and passage in the original dataset to ids
         Args:
             vocab: the vocabulary on this dataset
         """
-        for data_set in [self.train_set, self.dev_set]:
+        if set_name is None:
+            data_sets = [self.train_set, self.dev_set]
+        elif set_name == 'test':
+            data_sets = [self.test_sets]
+
+        for data_set in data_sets:
             if data_set is None:
                 continue
             for sample in data_set:

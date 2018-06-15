@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
 import sys
 
 from vocab2 import PretrainedVocab
@@ -38,15 +37,6 @@ def parse_args():
     """
     parser = argparse.ArgumentParser("Classification on VIDAA dataset")
     parser.add_argument(
-        "--prepare",
-        action="store_true",
-        help="create the directories, prepare the vocabulary and embeddings",
-    )
-    parser.add_argument("--train", action="store_true", help="train the model")
-    parser.add_argument(
-        "--evaluate", action="store_true", help="evaluate the model on dev set"
-    )
-    parser.add_argument(
         '--predict', action='store_true', help='predict the model on test set'
     )
     parser.add_argument("--char", action="store_true", help="use char embedding")
@@ -54,7 +44,7 @@ def parse_args():
     parser.add_argument("--gpu", type=str, default="0", help="specify gpu device")
 
     train_settings = parser.add_argument_group("train settings")
-    train_settings.add_argument("--dev", type=float, default=0.2, help="验证集比例")
+
     train_settings.add_argument(
         "--filter_sizes", type=list, default=[5], help="一维卷积核大小"
     )
@@ -107,8 +97,6 @@ def parse_args():
     )
     path_settings.add_argument(
         "--data_files",
-        nargs="+",
-        default=["data/atec_nlp_sim_train.csv", "data/atec_nlp_sim_train_add.csv"],
         help="list of files that contain the preprocessed train data",
     )
     path_settings.add_argument(
@@ -124,7 +112,7 @@ def parse_args():
         "--vocab_dir", default="data/vocab/", help="the dir to store models"
     )
     path_settings.add_argument(
-        "--result_dir", default="data/results/", help="the dir to output the results"
+        "--result_file", help="the dir to output the results"
     )
     path_settings.add_argument(
         "--summary_dir",
@@ -138,6 +126,9 @@ def parse_args():
         "--log_path",
         help="path of the log file. If not set, logs are printed to console",
     )
+    path_settings.add_argument(
+        '--test_file', type=str
+    )
     return parser.parse_args()
 
 
@@ -147,114 +138,33 @@ def prepare(args):
     """
     logger = logging.getLogger("alibaba")
     logger.info("Checking the data files... ")
-    for data in args.data_files:
-        assert os.path.exists(data), "{} file does not exist".format(data)
     logger.info("preprocess raw data...")
     jieba.load_userdict(args.dict_file)
     logger.info("segment raw data")
     preposs_file = open(args.preposs_file, "w")
-    index = 1
-    for data_file in args.data_files:
-        with open(data_file, "r") as fin:
-            for idx, line in enumerate(fin):
-                line = unicode(line, encoding="utf8")
-                line_re = re.sub(
-                    u"[’!\"#$%&'()*+,-./:;<=>?@，。?★、…【】《》？“”‘’！[\\]^_`{|}~]+", "", line
-                )
-                line_list = str(line_re).strip("\n").split("\t")
-                if len(line_list) != 4:
-                    logger.warning(
+    with open(args.test_file, "r") as fin:
+        for idx, line in enumerate(fin):
+            line = unicode(line, encoding="utf8")
+            line_re = re.sub(
+                u"[’!\"#$%&'()*+,-./:;<=>?@，。?★、…【】《》？“”‘’！[\\]^_`{|}~]+", "", line
+            )
+            line_list = str(line_re).strip("\n").split("\t")
+            if len(line_list) != 3:
+                logger.warning(
                         "{} - {} from is wrong".format(args.data_files, idx + 1)
                     )
-                    continue
-                document1 = line_list[1].strip().replace(" ", "")
-                document2 = line_list[2].strip().replace(" ", "")
-                segment_document1 = [_ for _ in jieba.cut(document1)]
-                segment_document2 = [_ for _ in jieba.cut(document2)]
-                preposs_file.write(str(index))
-                preposs_file.write("|")
-                preposs_file.write(" ".join(segment_document1))
-                preposs_file.write("|")
-                preposs_file.write(" ".join(segment_document2))
-                preposs_file.write("|")
-                preposs_file.write(line_list[3] + "\n")
-                index += 1
+                continue
+            document1 = line_list[1].strip().replace(" ", "")
+            document2 = line_list[2].strip().replace(" ", "")
+            segment_document1 = [_ for _ in jieba.cut(document1)]
+            segment_document2 = [_ for _ in jieba.cut(document2)]
+            preposs_file.write(line_list[0])
+            preposs_file.write("|")
+            preposs_file.write(" ".join(segment_document1))
+            preposs_file.write("|")
+            preposs_file.write(" ".join(segment_document2))
+            preposs_file.write("\n")
     preposs_file.close()
-    logger.info("Building vocabulary...")
-    for dir_path in [args.vocab_dir, args.model_dir, args.result_dir, args.summary_dir]:
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-
-    data = dataset.Dataset(args)
-    word_vocab_ = vocab.Vocab()
-    for token in data.word_iter(set_name="train"):
-        word_vocab_.add(token)
-    unfiltered_vocab_size = word_vocab_.size()
-    word_vocab_.filter_word_by_count(min_count=2)
-    filtered_num = unfiltered_vocab_size - word_vocab_.size()
-    logger.info(
-        "After filter {} tokens, the final word vocab size is {}".format(
-            filtered_num, word_vocab_.size()
-        )
-    )
-
-    logger.info("Assigning word embeddings...")
-    word_vocab_.random_init_embeddings(args.embedding_size)
-
-    character_vocab_ = vocab.Vocab()
-    for character in data.word_iter("train", character=True):
-        character_vocab_.add(character)
-    unfiltered_vocab_size = character_vocab_.size()
-    character_vocab_.filter_word_by_count(min_count=2)
-    filtered_num = unfiltered_vocab_size - character_vocab_.size()
-    logger.info(
-        "After filter {} characters, the final character vocab size is {}".format(
-            filtered_num, character_vocab_.size()
-        )
-    )
-    logger.info("Assigning character embeddings...")
-    character_vocab_.random_init_embeddings(args.character_embedding_size)
-
-    logger.info("Saving vocab...")
-    with open(os.path.join(args.vocab_dir, "vocab.data"), "wb") as fout:
-        pickle.dump(word_vocab_, fout)
-
-    logger.info("Saving character vocab...")
-    with open(os.path.join(args.vocab_dir, "vocab_character.data"), "wb") as fout:
-        pickle.dump(character_vocab_, fout)
-    logger.info("Done with preparing!")
-
-
-def train(args):
-    """
-    Training the classification model
-    """
-    logger = logging.getLogger("alibaba")
-    logger.info("Load data_set , vocab and label config...")
-    if args.pretrained_embedding:
-        word_vocab_ = PretrainedVocab(args)
-
-    else:
-        with open(os.path.join(args.vocab_dir, "vocab.data"), "rb") as fin:
-            word_vocab_ = pickle.load(fin)
-    with open(os.path.join(args.vocab_dir, "vocab_character.data"), "rb") as fin:
-        vocab_character_ = pickle.load(fin)
-    data = dataset.Dataset(args)
-    logger.info("Convert word to id...")
-    data.convert_to_ids(word_vocab_)
-    logger.info("Convert character to id...")
-    data.convert_to_ids(vocab_character_, character=True)
-    logger.info("Build Model...")
-    model_ = model.Model(args, word_vocab=word_vocab_, character_vocab=vocab_character_)
-    logger.info("Training the model...")
-    model_.train(
-        data,
-        args.epochs,
-        args.batch_size,
-        save_dir=args.model_dir,
-        save_prefix=args.class_model,
-    )
-    logger.info("Done with training...")
 
 
 def evaluate(args):
@@ -273,30 +183,24 @@ def evaluate(args):
         vocab_character_ = pickle.load(fin)
     data = dataset.Dataset(args)
     logger.info("Convert word to id...")
-    data.convert_to_ids(word_vocab_)
+    data.convert_to_ids(word_vocab_, set_name='test')
     logger.info("Convert character to id...")
-    data.convert_to_ids(vocab_character_, character=True)
+    data.convert_to_ids(vocab_character_, character=True, set_name='test')
     logger.info("Build Model...")
     model_ = model.Model(args, word_vocab=word_vocab_, character_vocab=vocab_character_)
     model_.restore(model_dir=args.model_dir, model_prefix=args.class_model)
     logger.info("Evaluating the model on dev set...")
-    dev_batchs = data.get_mini_batchs(batch_size=args.batch_size, set_name="dev")
-    loss_, accuracy, _, _ = model_.evaluate(
+    dev_batchs = data.get_mini_batchs(batch_size=args.batch_size, set_name="test", predict=True)
+    _ = model_.predictiton(
         batch_data=dev_batchs,
-        result_dir=args.result_dir,
-        result_prefix="dev.evaluate",
+        result_file=args.result_file,
         save_predict_label=True,
     )
-    logger.info("Loss on dev set: {}".format(loss_))
-    logger.info("Accuracy on dev set: {}".format(accuracy))
     logger.info(
-        "Predicted labels are saved to {}".format(os.path.join(args.result_dir))
+        "Predicted labels are saved to {}".format(args.result_file)
     )
 
-def run():
-    """
-    Prepare and runs the whole system
-    """
+if __name__=="__main__":
     args = parse_args()
 
     logger = logging.getLogger("alibaba")
@@ -316,14 +220,5 @@ def run():
         logger.addHandler(stream_handler)
 
     logger.info("Running with args : {}".format(args))
-
-    if args.prepare:
-        prepare(args)
-    if args.train:
-        train(args)
-    if args.evaluate:
-        evaluate(args)
-
-
-if __name__ == "__main__":
-    run()
+    prepare(args)
+    evaluate(args)

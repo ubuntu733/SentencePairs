@@ -6,4 +6,10 @@ data/results/
 .idea/
 __pycache__/
 venv/
+data/atec_nlp_sim_train.csv
+data/sim_train.csv
+data/atec_nlp_sim_train_add.csv
+data/train.data
 data/log*
+data/test.data
+result.data

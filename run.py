@@ -25,7 +25,7 @@ import pickle
 import argparse
 import logging
 import os
-from model import model
+import model
 import dataset
 import vocab
 import jieba
@@ -56,12 +56,12 @@ def parse_args():
     train_settings = parser.add_argument_group("train settings")
     train_settings.add_argument("--dev", type=float, default=0.2, help="验证集比例")
     train_settings.add_argument(
-        "--filter_sizes", type=list, default=[5], help="一维卷积核大小"
+        "--filter_size", type=int, default=5, help="一维卷积核大小"
     )
     train_settings.add_argument("--num_filters", type=int, default=32, help="卷积核数量")
     train_settings.add_argument("--optim", default="adam", help="optimizer type")
     train_settings.add_argument(
-        "--learning_rate", type=float, default=0.001, help="learning rate"
+        "--learning_rate", type=float, default=0.0001, help="learning rate"
     )
     train_settings.add_argument(
         "--weight_decay", type=float, default=0, help="weight decay"
@@ -153,6 +153,7 @@ def prepare(args):
     jieba.load_userdict(args.dict_file)
     logger.info("segment raw data")
     preposs_file = open(args.preposs_file, "w")
+    fasttext_file = open('data.fasttext_file', 'w')
     index = 1
     for data_file in args.data_files:
         with open(data_file, "r") as fin:
@@ -179,6 +180,9 @@ def prepare(args):
                 preposs_file.write("|")
                 preposs_file.write(line_list[3] + "\n")
                 index += 1
+                fasttext_file.write(" ".join(segment_document1)+'\n')
+                fasttext_file.write(" ".join(segment_document2)+'\n')
+
     preposs_file.close()
     logger.info("Building vocabulary...")
     for dir_path in [args.vocab_dir, args.model_dir, args.result_dir, args.summary_dir]:

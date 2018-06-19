@@ -13,3 +13,6 @@ data/train.data
 data/log*
 data/test.data
 result.data
+data/test
+data/test.zip
+TODO

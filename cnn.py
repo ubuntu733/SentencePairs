@@ -14,48 +14,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .layer import rnn, conv
+
 import tensorflow as tf
 import tensorflow.contrib as tc
+from layer import conv
 
 
-class RCNN(object):
+class CNN(object):
 
-    def __init__(self, doc1, doc2, args):
+    def __init__(self, doc1, doc2, args, dropout):
         self.doc1 = doc1
         self.doc2 = doc2
         self.args = args
+        self.dropout = dropout
 
     def build_graph(self):
-        self.document1_encode, _ = rnn(
-            rnn_type="bi-lstm",
-            scope="document_encode",
-            inputs=self.doc1,
-            length=None,
-            hidden_size=self.args.hidden_size,
-            reuse=None,
-        )
-        self.document2_encode, _ = rnn(
-            rnn_type="bi-lstm",
-            inputs=self.doc2,
-            scope="document_encode",
-            length=None,
-            hidden_size=self.args.hidden_size,
-            reuse=True,
-        )
         with tf.variable_scope("encode_conv"):
-            document1_pooled_outputs = []
-            document2_pooled_outputs = []
-            """
-            self.document1_embedded_chars_expanded = tf.expand_dims(
-                self.document1_encode, -1)
-            self.document2_embedded_chars_expanded = tf.expand_dims(
-                self.document2_encode, -1)
-            """
-            for i, filter_size in enumerate(self.args.filter_sizes):
-                with tf.name_scope("conv-maxpool-%s" % filter_size):
+
+            with tf.name_scope("conv" ):
+                document1_conv = tf.layers.conv1d(
+                    inputs=self.doc1,
+                    filters=self.args.num_filters,
+                    padding='same',
+                    kernel_size=self.args.filter_size
+                )
+
+                document2_conv = tf.layers.conv1d(
+                    inputs=self.doc2,
+                    filters=self.args.num_filters,
+                    padding='same',
+                    kernel_size=self.args.filter_size
+                )
+                document1_pool = tf.layers.max_pooling1d(
+                    inputs=document1_conv,
+                    pool_size=2,
+                    strides=1
+                )
+
+                document2_pool = tf.layers.max_pooling1d(
+                    inputs=document2_conv,
+                    pool_size=2,
+                    strides=1
+                )
+                self.document1_represent = tf.layers.flatten(document1_pool)
+                self.document2_represent = tf.layers.flatten(document2_pool)
+                '''
                     document1_conv = conv(
-                        inputs=self.document1_encode,
+                        inputs=self.doc1,
                         output_size=self.args.hidden_size,
                         activation=tf.nn.relu,
                         name="conv-%s" % filter_size,
@@ -63,7 +68,7 @@ class RCNN(object):
                         reuse=None,
                     )
                     document2_conv = conv(
-                        inputs=self.document2_encode,
+                        inputs=self.doc2,
                         output_size=self.args.hidden_size,
                         activation=tf.nn.relu,
                         name="conv-%s" % filter_size,
@@ -71,46 +76,6 @@ class RCNN(object):
                         reuse=True,
                     )
 
-                    """
-                    filter_shape = [
-                        filter_size,
-                        self.args.hidden_size * 2,
-                        1,
-                        self.args.num_filters]
-                    W1 = tf.Variable(tf.truncated_normal(
-                        filter_shape, stddev=0.1), name="W")
-                    b1 = tf.Variable(tf.constant(
-                        0.1, shape=[self.args.num_filters]), name="b")
-                    document1_conv = tf.nn.conv2d(
-                        self.document1_embedded_chars_expanded,
-                        W1,
-                        strides=[1, 1, 1, 1],
-                        padding="VALID",
-                        name="conv")
-                    document2_conv = tf.nn.conv2d(
-                        self.document2_embedded_chars_expanded,
-                        W1,
-                        strides=[1, 1, 1, 1],
-                        padding="VALID",
-                        name="conv")
-                    # Apply nonlinearity
-                    document1_h = tf.nn.relu(tf.nn.bias_add(document1_conv, b1), name="relu")
-                    document2_h = tf.nn.relu(tf.nn.bias_add(document2_conv, b1), name="relu")
-
-                    # Maxpooling over the outputs
-                    document1_pooled = tf.nn.max_pool(
-                        document1_conv,
-                        ksize=[1, self.args.max_document_len - filter_size + 1, 1, 1],
-                        strides=[1, 1, 1, 1],
-                        padding='VALID',
-                        name="pool")
-                    document2_pooled = tf.nn.max_pool(
-                        document2_conv,
-                        ksize=[1, self.args.max_document_len - filter_size + 1, 1, 1],
-                        strides=[1, 1, 1, 1],
-                        padding='VALID',
-                        name="pool")
-                    """
                     document1_conv = tf.reshape(
                         document1_conv,
                         [
@@ -154,4 +119,5 @@ class RCNN(object):
                 num_outputs=self.args.hidden_size,
                 activation_fn=tf.nn.tanh,
             )
+            '''
         return self.document1_represent, self.document2_represent

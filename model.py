@@ -20,13 +20,13 @@ import tensorflow.contrib as tc
 import numpy as np
 import logging
 import time
-from .layer import *
+from layer import *
 import os
 import json
 from sklearn import metrics
-from .rcnn import RCNN
-from .rnn import RNN
-from .cnn import CNN
+from rcnn import RCNN
+from rnn import RNN
+from cnn import CNN
 
 
 class Model(object):
@@ -71,10 +71,12 @@ class Model(object):
             tf.int32, [None, self.args.max_document_len, self.args.max_word_len]
         )
         self.label = tf.placeholder(tf.int64, [None, 2])
+        self.dropout = tf.placeholder(tf.float32, name='dropout')
 
     def _embed(self):
         with tf.variable_scope("embedding"):
             with tf.device("cpu:0"):
+
                 self.word_embeddings = tf.Variable(
                     tf.random_uniform(
                         [self.vocab.size(), self.args.embedding_size], -1.0, 1.0
@@ -92,7 +94,8 @@ class Model(object):
                     ),
                     name="character_embeddings",
                 )
-                """
+                '''
+
                 self.word_embeddings = tf.get_variable(
                     'word_embeddings',
                     shape=(self.vocab.size(), self.args.embedding_size),
@@ -106,7 +109,7 @@ class Model(object):
                         initializer=tf.constant_initializer(self.character_vocab.embedding),
                         trainable=True
                     )
-                """
+                '''
             self.document1_emb = tf.nn.embedding_lookup(
                 self.word_embeddings, self.document1
             )
@@ -183,9 +186,9 @@ class Model(object):
         if self.args.class_model == "rcnn":
             self.model = RCNN(doc1=self.doc1, doc2=self.doc2, args=self.args)
         elif self.args.class_model == "rnn":
-            self.model = RNN(doc1=self.doc1, doc2=self.doc2, args=self.args)
+            self.model = RNN(doc1=self.doc1, doc2=self.doc2, args=self.args, dropout=self.dropout)
         elif self.args.class_model == "cnn":
-            self.model = CNN(doc1=self.doc1, doc2=self.doc2, args=self.args)
+            self.model = CNN(doc1=self.doc1, doc2=self.doc2, args=self.args, dropout=self.dropout)
         else:
             raise NotImplementedError(
                 "Do not implement {} model".format(self.args.class_model)
@@ -194,14 +197,14 @@ class Model(object):
 
     def _match(self):
         with tf.variable_scope("match"):
-
             self.vector = tf.concat(
                 [self.document1_represent, self.document2_represent], 1
             )
+            self.vector = tf.nn.dropout(self.vector,1-self.dropout)
             self.score = tc.layers.fully_connected(
                 self.vector, num_outputs=2, activation_fn=tf.nn.tanh
             )
-
+            #self.score = tf.nn.softmax(self.score)
         """
             document1_len = tf.sqrt(tf.reduce_sum(tf.multiply(self.document1_represent, self.document1_represent), 1))
             document2_len = tf.sqrt(tf.reduce_sum(tf.multiply(self.document2_represent, self.document2_represent), 1))
@@ -222,7 +225,7 @@ class Model(object):
 
         with tf.variable_scope("loss"):
             self.loss = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits(
+                tf.nn.softmax_cross_entropy_with_logits_v2(
                     logits=self.score, labels=self.label
                 )
             )
@@ -265,6 +268,7 @@ class Model(object):
                 self.document1_character: batch["document1_character_ids"],
                 self.document2_character: batch["document2_character_ids"],
                 self.label: batch["label"],
+                self.dropout:self.args.dropout
             }
             _, loss, accuracy, score, vector, predict, doc1, doc2, a, b = self.sess.run(
                 [
@@ -416,6 +420,7 @@ class Model(object):
                 self.document1_character: batch["document1_character_ids"],
                 self.document2_character: batch["document2_character_ids"],
                 self.label: batch["label"],
+                self.dropout : 0
             }
 
             loss, accuracy, predict = self.sess.run(
@@ -483,6 +488,7 @@ class Model(object):
                 self.document2: batch["document2_ids"],
                 self.document1_character: batch["document1_character_ids"],
                 self.document2_character: batch["document2_character_ids"],
+                self.dropout:0
             }
 
             predict = self.sess.run(

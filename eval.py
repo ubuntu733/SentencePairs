@@ -24,7 +24,7 @@ import pickle
 import argparse
 import logging
 import os
-from model import model
+import model
 import dataset
 import vocab
 import jieba

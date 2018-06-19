@@ -20,17 +20,15 @@ class TFKLD(object):
 
     def loadtext(self, fname):
         text, label = [], []
-        count = 0
-        with open(fname, 'r') as fin:
+
+        with open(fname, 'rb') as fin:
             for line in fin:
+                line = line.decode("utf-8")
                 items = line.strip().split("\t")
                 label.append(int(items[0]))
                 text.append(items[1])
                 text.append(items[2])
 
-                count += 1
-                if count % 1000 == 0:
-                    break
         return text, label
 
 
@@ -108,14 +106,14 @@ class TFKLD(object):
         print (self.weight.shape)
 
     def __weighting(self, datasetM):
-        weight = ssp.lil_matrix(self.weight)
+        weight = ssp.lil_matrix(self.weight).toarray()
         print ('Applying weighting to training examples')
         for n in range(datasetM.shape[0]):
             if n % 1000 == 0:
                 print ('Process {} rows'.format(n))
-                print(weight)
-                print(datasetM[n, :])
-                datasetM[n, :] = list(numpy.multiply(numpy.array(datasetM[n, :]),  numpy.array(weight)))
+
+            datasetM[n, :] = numpy.multiply(numpy.array(datasetM[n, :]),  numpy.array(weight))
+
         return datasetM
 
     def save(self, fname):
@@ -131,7 +129,7 @@ class TFKLD(object):
 def main(dataset_path):
     tfkld = TFKLD(dataset_path)
     tfkld.weighting()
-    tfkld.save("../data/original-data.pickle.gz")
+    tfkld.save("../data/tfkdl-data.pickle.gz")
 
 
 if __name__ == "__main__":

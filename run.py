@@ -153,7 +153,6 @@ def prepare(args):
     jieba.load_userdict(args.dict_file)
     logger.info("segment raw data")
     preposs_file = open(args.preposs_file, "w")
-    fasttext_file = open('data.fasttext_file', 'w')
     index = 1
     for data_file in args.data_files:
         with open(data_file, "r") as fin:
@@ -172,6 +171,7 @@ def prepare(args):
                 document2 = line_list[2].strip().replace(" ", "")
                 segment_document1 = [_ for _ in jieba.cut(document1)]
                 segment_document2 = [_ for _ in jieba.cut(document2)]
+
                 preposs_file.write(str(index))
                 preposs_file.write("|")
                 preposs_file.write(" ".join(segment_document1))
@@ -180,8 +180,7 @@ def prepare(args):
                 preposs_file.write("|")
                 preposs_file.write(line_list[3] + "\n")
                 index += 1
-                fasttext_file.write(" ".join(segment_document1)+'\n')
-                fasttext_file.write(" ".join(segment_document2)+'\n')
+
 
     preposs_file.close()
     logger.info("Building vocabulary...")

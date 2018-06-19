@@ -30,25 +30,26 @@ class RNN(object):
     def build_graph(self):
         self.document1_encode, _ = rnn(
             rnn_type="bi-lstm",
-            scope="document_encode",
+            scope="document1_encode",
             inputs=self.doc1,
             length=None,
             hidden_size=self.args.hidden_size,
-            reuse=None,
             dropout_keep_prob=1-self.dropout
         )
         self.document2_encode, _ = rnn(
             rnn_type="bi-lstm",
             inputs=self.doc2,
-            scope="document_encode",
+            scope="document2_encode",
             length=None,
             hidden_size=self.args.hidden_size,
-            reuse=True,
             dropout_keep_prob=1-self.dropout
         )
-
+        '''
         self.doc1 = tf.reduce_max(self.document1_encode,axis=1)
         self.doc2 = tf.reduce_max(self.document2_encode,axis=1)
+        '''
+        self.doc1 = self.document1_encode[:,-1,:]
+        self.doc2 = self.document2_encode[:,-1,:]
         '''
         doc12doc2_attn = tf.matmul(tf.nn.softmax(self.sim_matrix, -1), self.document2_encode)
         self.doc1 = self.document1_encode * doc12doc2_attn

@@ -72,7 +72,7 @@ class Dataset(object):
                     sample["document2_character"] = self._add_character(
                         line_list[2].split(" ")
                     )
-                    sample["label"] = int(line_list[3])
+                    sample["label"] = self._label_2_list(int(line_list[3]))
                 data_set.append(sample)
             self.logger.info("DataSet size {} sample".format(len(data_set)))
 

@@ -70,9 +70,18 @@ class Model(object):
         self.document2_character = tf.placeholder(
             tf.int32, [None, self.args.max_document_len, self.args.max_word_len]
         )
-        self.label = tf.placeholder(tf.float32, [None])
+        self.label = tf.placeholder(tf.int32, [None, 2])
         self.dropout = tf.placeholder(tf.float32, name='dropout')
 
+        sentence_one_mask = tf.sign(self.document1,
+                                name="sentence_one_masking")
+        sentence_two_mask = tf.sign(self.document2,
+                                name="sentence_two_masking")
+
+        # The unpadded lengths of sentence one and sentence two
+        # Shape: (batch_size,)
+        self.sentence_one_len = tf.reduce_sum(sentence_one_mask, 1)
+        self.sentence_two_len = tf.reduce_sum(sentence_two_mask, 1)
     def _embed(self):
         with tf.variable_scope("embedding"):
             with tf.device("cpu:0"):
@@ -186,7 +195,13 @@ class Model(object):
         if self.args.class_model == "rcnn":
             self.model = RCNN(doc1=self.doc1, doc2=self.doc2, args=self.args)
         elif self.args.class_model == "rnn":
-            self.model = RNN(doc1=self.doc1, doc2=self.doc2, args=self.args, dropout=self.dropout)
+            self.model = RNN(
+                doc1=self.doc1,
+                doc2=self.doc2,
+                args=self.args,
+                dropout=self.dropout,
+                doc1_len=self.sentence_one_len,
+                doc2_len=self.sentence_two_len)
         elif self.args.class_model == "cnn":
             self.model = CNN(doc1=self.doc1, doc2=self.doc2, args=self.args, dropout=self.dropout)
         else:
@@ -197,11 +212,15 @@ class Model(object):
 
     def _match(self):
         with tf.variable_scope("match"):
+            self.predict = self._l1_similarity(self.document1_represent,
+                                self.document2_represent)
+            '''
             self.distance = tf.sqrt(tf.reduce_sum(tf.square(tf.subtract(self.document1_represent, self.document2_represent)), 1, keep_dims=True))
             self.distance = tf.div(self.distance,
                                    tf.add(tf.sqrt(tf.reduce_sum(tf.square(self.document1_represent), 1, keep_dims=True)),
                                           tf.sqrt(tf.reduce_sum(tf.square(self.document2_represent), 1, keep_dims=True))))
             self.distance = tf.reshape(self.distance, [-1], name="distance")
+            '''
             '''
             self.vector = tf.concat(
                 [self.document1_represent, self.document2_represent], 1
@@ -220,7 +239,7 @@ class Model(object):
             self.score = tf.div(mul, tf.multiply(document1_len,document2_len), name="score1")
         """
         with tf.variable_scope("predict"):
-            self.predict = tf.rint(self.distance)
+           # self.predict = tf.rint(self.distance)
             '''
             self.predict = tf.argmax(self.score, axis=1)
             '''
@@ -231,11 +250,18 @@ class Model(object):
             self.accuracy = tf.reduce_mean(
                 tf.cast(correct_predictions, "float"), name="accuracy"
             )
-            '''
             self.temp_sim = tf.subtract(tf.ones_like(self.distance), tf.rint(self.distance),
                                         name="temp_sim")  # auto threshold 0.5
             correct_predictions = tf.equal(self.temp_sim, self.label)
             self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
+            '''
+            correct_predictions = tf.equal(
+                tf.argmax(self.predict, 1),
+                tf.argmax(self.label, 1))
+
+            # Cast to float, and take the mean to get accuracy
+            self.accuracy = tf.reduce_mean(tf.cast(correct_predictions,
+                                                   "float"))
 
     def _compute_loss(self):
 
@@ -246,8 +272,12 @@ class Model(object):
                     logits=self.score, labels=self.label
                 )
             )
-            '''
             self.loss = self.contrastive_loss(self.label, self.distance, self.args.batch_size)
+            '''
+            self.loss = tf.reduce_mean(
+                -tf.reduce_sum(tf.cast(self.label, "float") *
+                               tf.log(self.predict),
+                               axis=1))
             self.all_params = tf.trainable_variables()
             if self.args.weight_decay > 0:
                 with tf.variable_scope("l2_loss"):
@@ -374,21 +404,21 @@ class Model(object):
             self.logger.info(
                 "classification_report: \n {}".format(
                     metrics.classification_report(
-                        labels, np.array(predicts)
+                        np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
                     )
                 )
             )
             self.logger.info(
                 "混淆矩阵为: \n {}".format(
                     metrics.confusion_matrix(
-                        labels, np.array(predicts)
+                        np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
                     )
                 )
             )
             self.logger.info(
                 "completeness_score: {}".format(
                     metrics.completeness_score(
-                        labels, np.array(predicts)
+                        np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
                     )
                 )
             )
@@ -398,27 +428,27 @@ class Model(object):
                         batch_size=batch_size, set_name="dev"
                     )
                     loss_, accuracy_, predicts, labels = self.evaluate(dev_batches)
-                    f1score = metrics.f1_score(labels, np.array(predicts))
+                    f1score = metrics.f1_score( np.argmax(labels, axis=1), np.argmax(predicts, axis=1))
                     self.logger.info("Dev eval loss {}".format(loss_))
                     self.logger.info("Dev eval accuracy {}".format(accuracy_))
                     self.logger.info(
                         "classification_report: \n {}".format(
                             metrics.classification_report(
-                                labels, np.array(predicts)
+                                np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
                             )
                         )
                     )
                     self.logger.info(
                         "混淆矩阵为: \n {}".format(
                             metrics.confusion_matrix(
-                                labels, np.array(predicts)
+                                np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
                             )
                         )
                     )
                     self.logger.info(
                         "completeness_score: {}".format(
                             metrics.completeness_score(
-                                labels, np.array(predicts)
+                                np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
                             )
                         )
                     )
@@ -590,3 +620,60 @@ class Model(object):
         # tmp= tf.mul(y,tf.square(d))
         tmp2 = (1 - y) * tf.square(tf.maximum((1 - d), 0))
         return tf.reduce_sum(tmp + tmp2) / batch_size / 2
+
+    def _l1_similarity(self, sentence_one, sentence_two):
+        """
+        Given a pair of encoded sentences (vectors), return a probability
+        distribution on whether they are duplicates are not with:
+        exp(-||sentence_one - sentence_two||)
+
+        Parameters
+        ----------
+        sentence_one: Tensor
+            A tensor of shape (batch_size, 2*rnn_hidden_size) representing
+            the encoded sentence_ones to use in the probability calculation.
+
+        sentence_one: Tensor
+            A tensor of shape (batch_size, 2*rnn_hidden_size) representing
+            the encoded sentence_twos to use in the probability calculation.
+
+        Returns
+        -------
+        class_probabilities: Tensor
+            A tensor of shape (batch_size, 2), represnting the probability
+            that a pair of sentences are duplicates as
+            [is_not_duplicate, is_duplicate].
+        """
+        with tf.name_scope("l1_similarity"):
+            # Take the L1 norm of the two vectors.
+            # Shape: (batch_size, 2*rnn_hidden_size)
+            l1_distance = tf.abs(sentence_one - sentence_two)
+
+            # Take the sum for each sentence pair
+            # Shape: (batch_size, 1)
+            summed_l1_distance = tf.reduce_sum(l1_distance, axis=1,
+                                               keep_dims=True)
+
+            # Exponentiate the negative summed L1 distance to get the
+            # positive-class probability.
+            # Shape: (batch_size, 1)
+            positive_class_probs = tf.exp(-summed_l1_distance)
+
+            # Get the negative class probabilities by subtracting
+            # the positive class probabilities from 1.
+            # Shape: (batch_size, 1)
+            negative_class_probs = 1 - positive_class_probs
+
+            # Concatenate the positive and negative class probabilities
+            # Shape: (batch_size, 2)
+            class_probabilities = tf.concat([negative_class_probs,
+                                             positive_class_probs], 1)
+
+            # if class_probabilities has 0's, then taking the log of it
+            # (e.g. for cross-entropy loss) will cause NaNs. So we add
+            # epsilon and renormalize by the sum of the vector.
+            safe_class_probabilities = class_probabilities + 1e-08
+            safe_class_probabilities /= tf.reduce_sum(safe_class_probabilities,
+                                                      axis=1,
+                                                      keep_dims=True)
+            return safe_class_probabilities

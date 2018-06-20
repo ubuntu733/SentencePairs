@@ -15,19 +15,29 @@
 # limitations under the License.
 # ==============================================================================
 
-from layer import rnn
+from layer import *
 import tensorflow as tf
 
 
 class RNN(object):
 
-    def __init__(self, doc1, doc2, args, dropout):
+    def __init__(self, doc1, doc2, doc1_len, doc2_len, args, dropout):
         self.doc1 = doc1
         self.doc2 = doc2
         self.args = args
         self.dropout = dropout
+        self.doc1_len = doc1_len
+        self.doc2_len = doc2_len
 
     def build_graph(self):
+        self.document1_encode, self.document2_encode = rnn2(
+            hidden_size=self.args.hidden_size,
+            document1=self.doc1,
+            document2=self.doc2,
+            documen1_len= self.doc1_len,
+            document2_len= self.doc2_len
+        )
+        '''
         self.document1_encode, _ = rnn(
             rnn_type="bi-lstm",
             scope="document1_encode",
@@ -45,11 +55,10 @@ class RNN(object):
             dropout_keep_prob=1-self.dropout
         )
         '''
+        '''
         self.doc1 = tf.reduce_max(self.document1_encode,axis=1)
         self.doc2 = tf.reduce_max(self.document2_encode,axis=1)
         '''
-        self.doc1 = self.document1_encode[:,-1,:]
-        self.doc2 = self.document2_encode[:,-1,:]
         '''
         doc12doc2_attn = tf.matmul(tf.nn.softmax(self.sim_matrix, -1), self.document2_encode)
         self.doc1 = self.document1_encode * doc12doc2_attn
@@ -61,4 +70,4 @@ class RNN(object):
         self.doc2 = tf.reduce_max(self.doc2, axis=1)
         tmp =tf.nn.top_k(self.sim_matrix, k=5)
         '''
-        return self.doc1, self.doc2
+        return self.document1_encode, self.document2_encode

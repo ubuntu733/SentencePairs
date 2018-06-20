@@ -195,6 +195,60 @@ def get_cell(rnn_type, hidden_size, layer_num=1, dropout_keep_prob=None):
     cells = tc.rnn.MultiRNNCell(cells, state_is_tuple=True)
     return cells
 
+def rnn2(hidden_size, document1, document2,documen1_len, document2_len,model='mean_pool', dropout=0):
+    rnn_cell_fw_one = tc.rnn.LSTMCell(hidden_size, state_is_tuple=True)
+    rnn_cell_bw_one = tc.rnn.LSTMCell(hidden_size, state_is_tuple=True)
+    with tf.variable_scope('encode_document'):
+        (fw_output_one, bw_output_one), _ = tf.nn.bidirectional_dynamic_rnn(
+            cell_fw=rnn_cell_fw_one,
+            cell_bw=rnn_cell_bw_one,
+            dtype="float",
+            sequence_length=documen1_len,
+            inputs=document1,
+            scope="encoded_sentence_one")
+        tf.get_variable_scope().reuse_variables()
+        (fw_output_two, bw_output_two), _ = tf.nn.bidirectional_dynamic_rnn(
+            cell_fw=rnn_cell_fw_one,
+            cell_bw=rnn_cell_bw_one,
+            dtype="float",
+            sequence_length=document2_len,
+            inputs=document2,
+            scope="encoded_sentence_one")
+        if model == "mean_pool":
+            # Mean pool the forward and backward RNN outputs
+            pooled_fw_output_one = mean_pool(fw_output_one,
+                                             documen1_len)
+            pooled_bw_output_one = mean_pool(bw_output_one,
+                                             documen1_len)
+            pooled_fw_output_two = mean_pool(fw_output_two,
+                                             document2_len)
+            pooled_bw_output_two = mean_pool(bw_output_two,
+                                             document2_len)
+            # Shape: (batch_size, 2*rnn_hidden_size)
+            encoded_sentence_one = tf.concat([pooled_fw_output_one,
+                                              pooled_bw_output_one], 1)
+            encoded_sentence_two = tf.concat([pooled_fw_output_two,
+                                              pooled_bw_output_two], 1)
+        elif model == "last":
+            # Get the last unmasked output from the RNN
+            last_fw_output_one = last_relevant_output(fw_output_one,
+                                                      documen1_len)
+            last_bw_output_one = last_relevant_output(bw_output_one,
+                                                      documen1_len)
+            last_fw_output_two = last_relevant_output(fw_output_two,
+                                                      document2_len)
+            last_bw_output_two = last_relevant_output(bw_output_two,
+                                                      document2_len)
+            # Shape: (batch_size, 2*rnn_hidden_size)
+            encoded_sentence_one = tf.concat([last_fw_output_one,
+                                              last_bw_output_one], 1)
+            encoded_sentence_two = tf.concat([last_fw_output_two,
+                                              last_bw_output_two], 1)
+        else:
+            raise ValueError("Got an unexpected value {} for "
+                             "rnn_output_mode, expected one of "
+                             "[mean_pool, last]")
+    return encoded_sentence_one, encoded_sentence_two
 
 def layer_norm(x, filters=None, epsilon=1e-6, scope=None, reuse=None):
     """Layer normalize the tensor x, averaging over the last dimension."""
@@ -223,3 +277,85 @@ def layer_norm_compute_python(x, epsilon, scale, bias):
     variance = tf.reduce_mean(tf.square(x - mean), axis=[-1], keep_dims=True)
     norm_x = (x - mean) * tf.rsqrt(variance + epsilon)
     return norm_x * scale + bias
+
+
+def mean_pool(input_tensor, sequence_length=None):
+    """
+    Given an input tensor (e.g., the outputs of a LSTM), do mean pooling
+    over the last dimension of the input.
+
+    For example, if the input was the output of a LSTM of shape
+    (batch_size, sequence length, hidden_dim), this would
+    calculate a mean pooling over the last dimension (taking the padding
+    into account, if provided) to output a tensor of shape
+    (batch_size, hidden_dim).
+
+    Parameters
+    ----------
+    input_tensor: Tensor
+        An input tensor, preferably the output of a tensorflow RNN.
+        The mean-pooled representation of this output will be calculated
+        over the last dimension.
+
+    sequence_length: Tensor, optional (default=None)
+        A tensor of dimension (batch_size, ) indicating the length
+        of the sequences before padding was applied.
+
+    Returns
+    -------
+    mean_pooled_output: Tensor
+        A tensor of one less dimension than the input, with the size of the
+        last dimension equal to the hidden dimension state size.
+    """
+    with tf.name_scope("mean_pool"):
+        # shape (batch_size, sequence_length)
+        input_tensor_sum = tf.reduce_sum(input_tensor, axis=-2)
+
+        # If sequence_length is None, divide by the sequence length
+        # as indicated by the input tensor.
+        if sequence_length is None:
+            sequence_length = tf.shape(input_tensor)[-2]
+
+        # Expand sequence length from shape (batch_size,) to
+        # (batch_size, 1) for broadcasting to work.
+        expanded_sequence_length = tf.cast(tf.expand_dims(sequence_length, -1),
+                                           "float32") + 1e-08
+
+        # Now, divide by the length of each sequence.
+        # shape (batch_size, sequence_length)
+        mean_pooled_input = (input_tensor_sum /
+                             expanded_sequence_length)
+        return mean_pooled_input
+
+
+def last_relevant_output(output, sequence_length):
+    """
+    Given the outputs of a LSTM, get the last relevant output that
+    is not padding. We assume that the last 2 dimensions of the input
+    represent (sequence_length, hidden_size).
+
+    Parameters
+    ----------
+    output: Tensor
+        A tensor, generally the output of a tensorflow RNN.
+        The tensor index sequence_lengths+1 is selected for each
+        instance in the output.
+
+    sequence_length: Tensor
+        A tensor of dimension (batch_size, ) indicating the length
+        of the sequences before padding was applied.
+
+    Returns
+    -------
+    last_relevant_output: Tensor
+        The last relevant output (last element of the sequence), as retrieved
+        by the output Tensor and indicated by the sequence_length Tensor.
+    """
+    with tf.name_scope("last_relevant_output"):
+        batch_size = tf.shape(output)[0]
+        max_length = tf.shape(output)[-2]
+        out_size = int(output.get_shape()[-1])
+        index = tf.range(0, batch_size) * max_length + (sequence_length - 1)
+        flat = tf.reshape(output, [-1, out_size])
+        relevant = tf.gather(flat, index)
+        return relevant

@@ -2,7 +2,10 @@
 from __future__ import division, print_function
 """ Copyright (c) 2011 Hiroyuki Tanaka. All rights reserved."""
 import itertools as itrt
-import util
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
+from mt_metrics import util
 
 
 def ter(inputwords, refwords):

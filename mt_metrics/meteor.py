@@ -1,5 +1,6 @@
 from itertools import groupby
 
+
 class Meteor(object):
     """
         Meteor evaluation metric, as defined in https://www.cs.cmu.edu/~alavie/papers/BanerjeeLavie2005-final.pdf
@@ -19,7 +20,7 @@ class Meteor(object):
         precision = match_count / len(s2)
         recall = match_count / len(s1)
 
-        f_mean = (10 * precision * recall) / (recall + 9 * precision)
+        f_mean = (10 * precision * recall) / (recall + 9 * precision + 1e-6)
 
         matching_indexes = []
         grams_dict = { g:0 for g in s1_grams }
@@ -39,6 +40,6 @@ class Meteor(object):
                                 enumerate(matching_indexes),
                                 (lambda t:t[0]-t[1])
                             )
-            ]) / match_count) ** 3
+            ]) / (match_count + 1e-6)) ** 3
 
         return f_mean * (1 - penalty)

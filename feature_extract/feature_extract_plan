@@ -52,6 +52,11 @@
 --------------
 ## word align(Paraphrase identification and semantic text similarity analysis in Arabic news tweets using lexical, syntactic, and semantic features)
 
+----------------
+## summarization feature
+
+参照gensim summarization 
+
 --------------
 ##  semantic feature
 

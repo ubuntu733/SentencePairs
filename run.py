@@ -61,7 +61,7 @@ def parse_args():
     train_settings.add_argument("--num_filters", type=int, default=32, help="卷积核数量")
     train_settings.add_argument("--optim", default="adam", help="optimizer type")
     train_settings.add_argument(
-        "--learning_rate", type=float, default=0.0001, help="learning rate"
+        "--learning_rate", type=float, default=0.001, help="learning rate"
     )
     train_settings.add_argument(
         "--weight_decay", type=float, default=0, help="weight decay"
@@ -75,7 +75,7 @@ def parse_args():
     )
     train_settings.add_argument("--epochs", type=int, default=10, help="train epochs")
     train_settings.add_argument(
-        "--hidden_size", type=int, default=128, help="number of rnn hidden unit"
+        "--hidden_size", type=int, default=50, help="number of rnn hidden unit"
     )
     train_settings.add_argument(
         "--max_document_len", type=int, default=10, help="max length of document"

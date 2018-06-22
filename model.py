@@ -70,7 +70,7 @@ class Model(object):
         self.document2_character = tf.placeholder(
             tf.int32, [None, self.args.max_document_len, self.args.max_word_len]
         )
-        self.label = tf.placeholder(tf.int32, [None, 2])
+        self.label = tf.placeholder(tf.float32, [None])
         self.dropout = tf.placeholder(tf.float32, name='dropout')
 
         sentence_one_mask = tf.sign(self.document1,
@@ -212,6 +212,7 @@ class Model(object):
 
     def _match(self):
         with tf.variable_scope("match"):
+            '''
             self.predict = self._l1_similarity(self.document1_represent,
                                 self.document2_represent)
             '''
@@ -220,7 +221,6 @@ class Model(object):
                                    tf.add(tf.sqrt(tf.reduce_sum(tf.square(self.document1_represent), 1, keep_dims=True)),
                                           tf.sqrt(tf.reduce_sum(tf.square(self.document2_represent), 1, keep_dims=True))))
             self.distance = tf.reshape(self.distance, [-1], name="distance")
-            '''
             '''
             self.vector = tf.concat(
                 [self.document1_represent, self.document2_represent], 1
@@ -239,7 +239,7 @@ class Model(object):
             self.score = tf.div(mul, tf.multiply(document1_len,document2_len), name="score1")
         """
         with tf.variable_scope("predict"):
-           # self.predict = tf.rint(self.distance)
+            self.predict = tf.rint(self.distance)
             '''
             self.predict = tf.argmax(self.score, axis=1)
             '''
@@ -250,6 +250,7 @@ class Model(object):
             self.accuracy = tf.reduce_mean(
                 tf.cast(correct_predictions, "float"), name="accuracy"
             )
+            '''
             self.temp_sim = tf.subtract(tf.ones_like(self.distance), tf.rint(self.distance),
                                         name="temp_sim")  # auto threshold 0.5
             correct_predictions = tf.equal(self.temp_sim, self.label)
@@ -262,7 +263,7 @@ class Model(object):
             # Cast to float, and take the mean to get accuracy
             self.accuracy = tf.reduce_mean(tf.cast(correct_predictions,
                                                    "float"))
-
+            '''
     def _compute_loss(self):
 
         with tf.variable_scope("loss"):
@@ -272,12 +273,14 @@ class Model(object):
                     logits=self.score, labels=self.label
                 )
             )
+            '''
             self.loss = self.contrastive_loss(self.label, self.distance, self.args.batch_size)
             '''
             self.loss = tf.reduce_mean(
                 -tf.reduce_sum(tf.cast(self.label, "float") *
                                tf.log(self.predict),
                                axis=1))
+            '''
             self.all_params = tf.trainable_variables()
             if self.args.weight_decay > 0:
                 with tf.variable_scope("l2_loss"):
@@ -404,21 +407,21 @@ class Model(object):
             self.logger.info(
                 "classification_report: \n {}".format(
                     metrics.classification_report(
-                        np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
+                        labels, predicts
                     )
                 )
             )
             self.logger.info(
                 "混淆矩阵为: \n {}".format(
                     metrics.confusion_matrix(
-                        np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
+                        labels, predicts
                     )
                 )
             )
             self.logger.info(
                 "completeness_score: {}".format(
                     metrics.completeness_score(
-                        np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
+                        labels, predicts
                     )
                 )
             )
@@ -428,27 +431,27 @@ class Model(object):
                         batch_size=batch_size, set_name="dev"
                     )
                     loss_, accuracy_, predicts, labels = self.evaluate(dev_batches)
-                    f1score = metrics.f1_score( np.argmax(labels, axis=1), np.argmax(predicts, axis=1))
+                    f1score = metrics.f1_score(labels, predicts)
                     self.logger.info("Dev eval loss {}".format(loss_))
                     self.logger.info("Dev eval accuracy {}".format(accuracy_))
                     self.logger.info(
                         "classification_report: \n {}".format(
                             metrics.classification_report(
-                                np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
+                                labels, predicts
                             )
                         )
                     )
                     self.logger.info(
                         "混淆矩阵为: \n {}".format(
                             metrics.confusion_matrix(
-                                np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
+                                labels, predicts
                             )
                         )
                     )
                     self.logger.info(
                         "completeness_score: {}".format(
                             metrics.completeness_score(
-                                np.argmax(labels, axis=1), np.argmax(predicts, axis=1)
+                                labels, predicts
                             )
                         )
                     )

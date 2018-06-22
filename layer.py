@@ -359,3 +359,24 @@ def last_relevant_output(output, sequence_length):
         flat = tf.reshape(output, [-1, out_size])
         relevant = tf.gather(flat, index)
         return relevant
+
+
+def stackedRNN( x, dropout_keep, scope, hidden_units):
+    n_hidden = hidden_units
+    n_layers = 3
+    # Prepare data shape to match `static_rnn` function requirements
+    x = tf.unstack(tf.transpose(x, perm=[1, 0, 2]))
+    # print(x)
+    # Define lstm cells with tensorflow
+    # Forward direction cell
+
+    with tf.name_scope("fw" + scope), tf.variable_scope("fw" + scope):
+        stacked_rnn_fw = []
+        for _ in range(n_layers):
+            fw_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden, forget_bias=1.0, state_is_tuple=True)
+            lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=dropout_keep)
+            stacked_rnn_fw.append(lstm_fw_cell)
+        lstm_fw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_fw, state_is_tuple=True)
+
+        outputs, _ = tf.nn.static_rnn(lstm_fw_cell_m, x, dtype=tf.float32)
+    return outputs[-1]

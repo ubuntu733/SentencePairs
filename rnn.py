@@ -30,6 +30,7 @@ class RNN(object):
         self.doc2_len = doc2_len
 
     def build_graph(self):
+        '''
         self.document1_encode, self.document2_encode = rnn2(
             hidden_size=self.args.hidden_size,
             document1=self.doc1,
@@ -37,6 +38,9 @@ class RNN(object):
             documen1_len= self.doc1_len,
             document2_len= self.doc2_len
         )
+        '''
+        self.out1 = stackedRNN(self.doc1, 1-self.dropout, "side1", self.args.hidden_size)
+        self.out2 = stackedRNN(self.doc2, 1-self.dropout, "side2", self.args.hidden_size)
         '''
         self.document1_encode, _ = rnn(
             rnn_type="bi-lstm",
@@ -54,20 +58,9 @@ class RNN(object):
             hidden_size=self.args.hidden_size,
             dropout_keep_prob=1-self.dropout
         )
-        '''
-        '''
+
+
         self.doc1 = tf.reduce_max(self.document1_encode,axis=1)
         self.doc2 = tf.reduce_max(self.document2_encode,axis=1)
         '''
-        '''
-        doc12doc2_attn = tf.matmul(tf.nn.softmax(self.sim_matrix, -1), self.document2_encode)
-        self.doc1 = self.document1_encode * doc12doc2_attn
-        b = tf.nn.softmax(tf.expand_dims(tf.reduce_max(self.sim_matrix, 2), 1), -1)
-        doc22doc1_atten = tf.tile(tf.matmul(b, self.document1_encode),
-                                         [1, tf.shape(self.document1_encode)[1], 1])
-        self.doc2 = self.document2_encode * doc22doc1_atten
-        #self.doc1 = tf.reduce_max(self.doc1, axis=1)
-        self.doc2 = tf.reduce_max(self.doc2, axis=1)
-        tmp =tf.nn.top_k(self.sim_matrix, k=5)
-        '''
-        return self.document1_encode, self.document2_encode
+        return self.out1, self.out2

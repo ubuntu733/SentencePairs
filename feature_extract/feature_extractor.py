@@ -1,6 +1,5 @@
 #/usr/bin/env python
-#coding="utf-8"
-
+#coding=utf-8
 
 """
 提供特征抽取的对外接口
@@ -13,15 +12,19 @@ from sklearn.feature_extraction import DictVectorizer
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
 from feature_extract.extractor_util import *
+from feature_extract.tf_kdl_weight import TFKLD
+from feature_extract.preprocess import my_tokenizer
+from feature_extract.semantic_feature_extractor import *
+import time
 
 
 class FeatureExtractor(object):
-    def __init__(self, semantic_model_path_dict={}):
+    def __init__(self):
         """
         :param tfkdl_path:
         :param lda_path:
         """
-        self.semantic_model_path_dict = semantic_model_path_dict
+        self.load_semantic_model()
         pass
 
     def load_semantic_model(self):
@@ -29,7 +32,14 @@ class FeatureExtractor(object):
         加载语义模型
         :return:
         """
-        pass
+        tfkdl_params_path = "../data/tfkdl_params.pickle"
+        tfkdl_params = pickle.load(open(tfkdl_params_path, "rb"))
+        self.tfkdl_weight = tfkdl_params["weight"]
+        self.tfkdl_counterizer = tfkdl_params["countvector_model"]
+        self.tfkdl_object = TFKLD(None)
+
+        self.countvectorizer_obj = pickle.load(open("../data/countvector.model", "rb"))
+        self.tfidf_obj = pickle.load(open("../data/tfidf.model", "rb"))
 
     def extract_sentpair_feature(self, sent_1, sent_2):
         """
@@ -57,9 +67,10 @@ class FeatureExtractor(object):
         feature_set_dict.update(extract_translation_eval_metrics(sent_1, sent_2, "word"))
         feature_set_dict.update(extract_translation_eval_metrics(sent_1_character, sent_2_character, "word"))
 
-        # TODO
-        for semantic_model_name, semantic_model_path in self.semantic_model_path_dict.items():
-            pass
+        # extract the semantic similarity feature
+        feature_set_dict["tfidf_sim"] = cal_tfidf_sim(self.countvectorizer_obj, self.tfidf_obj, sent_1, sent_2)
+        feature_set_dict["tfkdl_sim"] = cal_tfkdl_sim(self.tfkdl_object, self.tfkdl_weight,
+                                                      self.tfkdl_counterizer, sent_1, sent_2)
 
         return feature_set_dict
 
@@ -69,24 +80,36 @@ class FeatureExtractor(object):
         :return:list of dict, feature vector matrix(n_samples, n_features)
         """
         dataset_features = []
+        count = 0
         for sent1, sent2 in dataset:
             dataset_features.append(self.extract_sentpair_feature(sent1, sent2))
+            count += 1
+            if count % 1000 == 0:
+                print("===there have tacked count is===", count)
         dict_vectorizer = DictVectorizer(sparse=False)
 
-        return dataset_features, dict_vectorizer.fit_transform(dataset_features)
+        return dict_vectorizer, dict_vectorizer.fit_transform(dataset_features)
 
 
 if __name__ == "__main__":
+    # TODO multiprocessing tackle
+
     feature_extractor = FeatureExtractor()
 
     dataset = []
+    start_time = time.time()
     with open("../data/data_tfkdl.txt", "rb") as reader:
         for line in reader:
             line = line.decode("utf-8")
             line_list = line.strip().split("\t")
             dataset.append((line_list[1], line_list[2]))
 
-    dataset_feature, dataset_vector = feature_extractor.extract_corpus_feature(dataset)
+    print("===time using is ===", time.time() - start_time)
 
-    print(dataset_feature)
-    print(dataset_vector)
+    dict_vectorizer, dataset_vector = feature_extractor.extract_corpus_feature(dataset)
+
+    pickle.dump(dict_vectorizer, open("../data/dict_vectorizer.model", "wb"), 2)
+    pickle.dump(dataset_vector, open("../data/featurematrix.data", "wb"), 2)
+
+    print(dict_vectorizer.feature_names_)
+    print(dataset_vector[:1])

@@ -7,10 +7,10 @@ from sklearn.feature_extraction.text import CountVectorizer
 from pickle import load, dump
 import numpy
 import scipy.sparse as ssp
-
-
-def my_tokenizer(sentence):
-    return sentence.split()
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
+from feature_extract.preprocess import my_tokenizer
 
 
 class TFKLD(object):
@@ -36,7 +36,6 @@ class TFKLD(object):
                 count += 1
 
         return text, label
-
 
 
     def createdata(self):
@@ -91,8 +90,8 @@ class TFKLD(object):
         self.computeKLD(count)
 
         # Apply weights
-        print ('Weighting ...')
-        self.tfkdl_train = self.weighting_internal(M, self.weight)
+        #print ('Weighting ...')
+        #self.tfkdl_train = self.weighting_internal(M, self.weight)
 
     def computeKLD(self, count):
         # Smoothing
@@ -108,28 +107,20 @@ class TFKLD(object):
 
     def weighting_internal(self, datasetM, weight):
         weight = ssp.lil_matrix(weight).toarray()
-        print ('Applying weighting to training examples')
+        # print ('Applying weighting to training examples')
         for n in range(datasetM.shape[0]):
-            if n % 1000 == 0:
-                print ('Process {} rows'.format(n))
-
-        datasetM[n, :] = numpy.multiply(numpy.array(datasetM[n, :]),  numpy.array(weight))
+            # if n % 1000 == 0:
+            #     print ('Process {} rows'.format(n))
+            datasetM[n, :] = numpy.multiply(numpy.array(datasetM[n, :]),  numpy.array(weight))
 
         return datasetM
 
-    def save(self, fname_weight, fname_vector):
+    def save(self, fname):
         D = {"weight": self.weight,
              "countvector_model": self.countizer}
 
-        with open("../data/tfkdl_params.pickle", 'wb') as fout:
+        with open(fname, 'wb') as fout:
             dump(D, fout, 2)
-
-        with open(fname_weight, 'wb') as fout:
-            dump(self.weight, fout, 2)
-
-        with open(fname_vector, 'wb') as fout:
-            dump(self.countizer, fout, 2)
-
         print ('Done')
 
 
@@ -137,7 +128,7 @@ def main(dataset_path):
     tfkld = TFKLD(dataset_path)
     tfkld.weighting()
 
-    tfkld.save("../data/tfkdl_weight.pickle", "../data/tfkdl_countvector.pickle")
+    tfkld.save("../data/tfkdl_params_correct.pickle")
 
 
 if __name__ == "__main__":

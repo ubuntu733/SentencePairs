@@ -142,7 +142,7 @@ def extract_word_align_feature(sent_1, sent_2, type="word"):
     align_feature = {}
 
     row_min_vector = distance_matrix.min(axis=1)
-    print(row_min_vector)
+    # print(row_min_vector)
     sum_v = sum(np.sort(row_min_vector)[:5])
 
     levenstein_pre = sum_v * 1.0 / len(sent_1)

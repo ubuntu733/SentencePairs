@@ -9,10 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 from pickle import load, dump
 from feature_extract.tf_kdl_weight import TFKLD
 from feature_extract.dimention_reduction import DimReduction
-
-
-def my_tokenizer(x):
-    return x.split()
+from feature_extract.preprocess import my_tokenizer
 
 
 if __name__ == "__main__":

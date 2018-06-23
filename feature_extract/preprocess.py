@@ -29,3 +29,7 @@ def change_sentence(sentence):
     sentence = re.sub(r'[*]+', "N", sentence)
 
     return sentence
+
+
+def my_tokenizer(sentence):
+    return sentence.split()

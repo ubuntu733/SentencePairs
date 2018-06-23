@@ -1,0 +1,94 @@
+--------------------
+#   数据预处理
+    1.  基于分词预处理
+    2.  基于n-gram character预处理
+
+##  text cleaning，移除特殊字符、标点符号、将***换成数字N,
+##  text normalization使用近义词词典、在线词典以及手动词典
+
+##  Data Augmentation
+----------------------
+#   用于无监督学习的特征
+------------
+##  Basic text features:
+
+### https://github.com/aaronlyt/Kaggle-Quora-Question-Pairs-1
+
+    Length information: Character and word length.
+    Length difference information: Character and word level length absolute differences, log length absolute differences, length ratio, log length ratio.
+    Common word intersection count
+    Various string fuzzy matching scores
+    Non-ascii word count
+    Punctuation symbol count
+    Number in question count
+    Out of vocabulary word wount
+
+### ASOBEK: Twitter Paraphrase Identification with Simple Overlap Features and SVMs
+
+    Size of union: the size of the union of the tokens in the two texts of a candidate paraphrase pair.
+    Size of intersection: the number of tokens common to the texts of a candidate paraphrase pair.
+    Text Size: the size of the set of tokens representing a given text
+
+    token type，character 或者 word，每一种都能够产生四组特征((union, intersection, sizes of tweet 1 and tweet 2)
+    character bigram和word unigram组合 (e.g. C1W2) represent eight features: those for C1 plus those for W2.
+
+### Paraphrase identification and semantic text similarity analysis in Arabic news tweets using lexical, syntactic, and semantic features
+
+    lexical overlap features
+
+### Paraphrase Recognition via Dissimilarity Significance Classification
+
+    去除相同的词语后，计算不相似的分数
+
+-----------
+##  Machine Translation Metrics
+
+    blue
+    meteor
+    nist
+    rouge
+    ter
+
+--------------
+## word align(Paraphrase identification and semantic text similarity analysis in Arabic news tweets using lexical, syntactic, and semantic features)
+
+----------------
+## summarization feature
+
+参照gensim summarization 
+
+--------------
+##  semantic feature
+
+    Latent semantic embedding features:
+
+        Character and word N-gram (N=1~3) count matrices, TF-IDF weight matrices with L1, L2-norm. We also applied SVD on TF-IDF weight matrices to perform dimension reduction.
+
+    cosine similarity(可以使用多种相似度衡量方法) of TF-IDF
+
+    TF-KDL
+
+    LDA
+
+    Neural embedding features(sum word embedding and normalize it to unit vector to represent a sentence)
+    Neural Sentence embedding learning
+--------------
+##  quora question duplicated solution reference
+
+    https://github.com/aerdem4/kaggle-quora-dup(23rd solution)
+    https://github.com/YuriyGuts/kaggle-quora-question-pairs(top 2)
+    
+-------------------------------
+#   model
+
+    Training and Ensembling
+
+
+-----------------------------
+#   post-process
+
+##  Class Label Reweighting
+
+    https://github.com/aaronlyt/Kaggle-Quora-Question-Pairs-1
+
+##

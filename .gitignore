@@ -13,3 +13,4 @@ data/train.data
 data/log*
 data/test.data
 result.data
+alibaba/logs

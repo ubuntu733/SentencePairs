@@ -1,1 +1,1 @@
-python eval.py --predict --test_file $1 --class_model rnn --result_file $2
+python test.py --in_path $1 --word_vec_path alibaba/fasttext.txt.vec --out_path $2 --model_prefix alibaba/logs/SentenceMatch.alibaba

@@ -4,13 +4,17 @@
 ## Time-stamp: <yangfeng 09/08/2014 20:08:44>
 
 from sklearn.feature_extraction.text import CountVectorizer
-from pickle import load, dump
+from pickle import dump
 import numpy
 import scipy.sparse as ssp
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
-from feature_extract.preprocess import my_tokenizer
+
+#from feature_extract.preprocess import my_tokenizer
+
+def my_tokenizer(x):
+    return x.split()
 
 
 class TFKLD(object):
@@ -34,6 +38,8 @@ class TFKLD(object):
                 text.append(items[2])
 
                 count += 1
+                #if count % 100 == 0:
+                #    break
 
         return text, label
 
@@ -124,14 +130,19 @@ class TFKLD(object):
         print ('Done')
 
 
-def main(dataset_path):
+def main(dataset_path, save_path):
     tfkld = TFKLD(dataset_path)
+
+    #text, label = tfkld.loadtext(dataset_path)
+    #print("=====", len(text))
+
     tfkld.weighting()
 
-    tfkld.save("../data/tfkdl_params_correct.pickle")
+    tfkld.save(save_path)
 
 
 if __name__ == "__main__":
-    main("../data/data_tfkdl.txt")
+    #main("../data/ori_data/train_process.csv", "../data/m_result/tfkdl_params_train.pickle")
+    main("../data/ori_data/complete_process.csv", "../data/m_result/tfkdl_params_complete.pickle")
 
 

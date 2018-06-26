@@ -151,7 +151,7 @@ def extract_word_align_feature(sent_1, sent_2, type="word"):
     align_feature["levenshtein_recall_%s" % type] = levenstein_rec
     align_feature["levenshtein_f1_%s" % type] = 2 * levenstein_pre * levenstein_rec * 1.0 / (levenstein_pre + levenstein_rec + 1e-6)
 
-    sum_align_vector = sum(np.argsort(distance_matrix)[:, 0] - np.array(range(0, len(sent_1))))
+    sum_align_vector = sum(abs(np.argsort(distance_matrix)[:, 0] - np.array(range(0, len(sent_1)))))
     align_pre = sum_align_vector * 1.0 / len(sent_1)
     align_rec = sum_align_vector * 1.0 / len(sent_2)
     align_feature["align_precision_%s" % type] = align_pre
@@ -195,7 +195,8 @@ def extract_translation_eval_metrics(sent1, sent2, type="word"):
         mt_eval_metrics_feature["nist_ngram_%d_%s" % (n_gram, type)] = nist_obj.score()
 
     # calculate rouge score
-    mt_eval_metrics_feature.update(rouge([sent1], [sent2]))
+    for key, val in rouge([sent1], [sent2]).items():
+        mt_eval_metrics_feature[key + "_%s" % type] = val
 
     # calculate ter score
     mt_eval_metrics_feature["ter_%s" % type] = ter(sent_1, sent_2)

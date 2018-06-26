@@ -72,6 +72,12 @@
 
     Neural embedding features(sum word embedding and normalize it to unit vector to represent a sentence)
     Neural Sentence embedding learning
+
+------------------------
+##  syntactic feature
+
+    这种特征可以解析出来，存储成为文本文件的格式(当作一种Pattern)，在预测的时候查找句子是否有这种pattern即可
+
 --------------
 ##  quora question duplicated solution reference
 

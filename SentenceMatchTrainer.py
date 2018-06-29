@@ -177,7 +177,9 @@ def predict(sess, valid_graph, devDataStream, outpath=None, label_vocab=None):
             for i in xrange(cur_batch.batch_size):
                 (sentence1, sentence2, _, _, _, _, cur_ID) = cur_batch.instances[i]
                 write_file.write(cur_ID + '\t')
-                write_file.write(label_vocab.getWord(predictions[i]) + '\n')
+                write_file.write(label_vocab.getWord(predictions[i]) + '\t')
+                write_file.write(str(probs[i][1])+'\t')
+                write_file.write(str(probs[i][0])+'\n')
 
             '''
                 result_json[cur_ID] = {

@@ -16,6 +16,7 @@ from vocab_utils import Vocab
 from SentenceMatchDataStream import SentenceMatchDataStream
 from SentenceMatchModelGraph import SentenceMatchModelGraph
 import namespace_utils
+from feature_extract import feature_extractor
 
 def collect_vocabs(train_path, with_POS=False, with_NER=False):
     all_labels = set()
@@ -133,6 +134,7 @@ def train(sess, saver, train_graph, valid_graph, trainDataStream, devDataStream,
         duration = time.time() - start_time
         print("Accuracy for test set is %.2f" % acc)
         f1_score = metrics.f1_score(labels, predicts)
+        print("验证集f1-score: {}\n".format(str(f1_score)))
         print(
             "验证集 classification_report: \n {}".format(
                 metrics.classification_report(
@@ -157,6 +159,7 @@ def train(sess, saver, train_graph, valid_graph, trainDataStream, devDataStream,
         print('Evaluation time: %.3f sec' % (duration))
         if f1_score>= best_f1score:
             best_f1score = f1_score
+            print('存储 {}迭代次数模型'.format(epoch + 1))
             saver.save(sess, best_path)
 
 
@@ -213,7 +216,7 @@ def main(FLAGS):
     label_path = path_prefix + ".label_vocab"
     has_pre_trained_model = False
     char_vocab = None
-    if os.path.exists(best_path + ".index"):
+    if os.path.exists(best_path + ".1index"):
         has_pre_trained_model = True
         print('Loading vocabs from a pre-trained model ...')
         label_vocab = Vocab(label_path, fileformat='txt2')

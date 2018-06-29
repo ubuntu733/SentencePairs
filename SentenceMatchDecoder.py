@@ -80,6 +80,7 @@ if __name__ == '__main__':
                                               label_vocab=label_vocab)
         print("Accuracy for test set is %.2f" % acc)
         f1_score = metrics.f1_score(labels, predicts )
+        print("验证集f1-score:{} \n".format(str(f1_score)))
         print(
             "验证集 classification_report: \n {}".format(
                 metrics.classification_report(

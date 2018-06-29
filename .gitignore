@@ -15,6 +15,16 @@ data/log*
 data/test.data
 result.data
 alibaba/logs
+alibaba/logs1
+alibaba/logs8
+alibaba/atec_nlp_sim_train.csv
+alibaba/atec_nlp_sim_train_add.csv
+alibaba/train.csv
+alibaba/tmp
+alibaba/backup
+alibaba/dev.csv
+alibaba/fasttext.txt.vec
+alibaba/result*
 *.pyc
 data/models/
 data/summary/
@@ -34,3 +44,9 @@ data/test.data
 result.data
 test
 submit/submit_online
+tmp.py
+正样本.txt
+负样本.txt
+result.json
+TODO
+

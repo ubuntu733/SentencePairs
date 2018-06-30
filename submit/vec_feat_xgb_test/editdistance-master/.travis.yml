@@ -1,0 +1,22 @@
+sudo: required
+services: [docker]
+env:
+  global:
+    - CIBW_TEST_REQUIRES=nose
+    - CIBW_TEST_COMMAND="nosetests {project}/test"
+    - TWINE_USERNAME=aflc
+matrix:
+  include:
+    - os: linux
+      language: python
+    - os: osx
+      language: ruby
+
+script:
+- pip install cibuildwheel==0.6.0
+- cibuildwheel --output-dir wheelhouse
+- |
+    if [[ $TRAVIS_TAG ]]; then
+      python -m pip install twine
+      python -m twine upload wheelhouse/*.whl
+    fi

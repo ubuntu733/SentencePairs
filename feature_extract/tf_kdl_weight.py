@@ -96,8 +96,8 @@ class TFKLD(object):
         self.computeKLD(count)
 
         # Apply weights
-        #print ('Weighting ...')
-        #self.tfkdl_train = self.weighting_internal(M, self.weight)
+        print ('Weighting ...')
+        self.tfkdl_train = self.weighting_internal(M, self.weight)
 
     def computeKLD(self, count):
         # Smoothing
@@ -142,7 +142,7 @@ def main(dataset_path, save_path):
 
 
 if __name__ == "__main__":
-    #main("../data/ori_data/train_process.csv", "../data/m_result/tfkdl_params_train.pickle")
-    main("../data/ori_data/complete_process.csv", "../data/m_result/tfkdl_params_complete.pickle")
+    main("../data/ori_data/train_process.csv", "../data/m_result/tfkdl_params_train.pickle")
+    #main("../data/ori_data/complete_process.csv", "../data/m_result/tfkdl_params_complete.pickle")
 
 

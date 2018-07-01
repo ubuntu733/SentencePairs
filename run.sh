@@ -1,1 +1,1 @@
-python test.py --in_path $1 --word_vec_path alibaba/fasttext.txt.vec --out_path $2 --model_prefix alibaba/logs/SentenceMatch.alibaba
+python test.py --in_path $1 --word_vec_path alibaba/logs8/fasttext.txt.vec --out_path $2 --model_prefix alibaba/logs8/SentenceMatch.alibaba

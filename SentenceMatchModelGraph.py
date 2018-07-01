@@ -1,7 +1,12 @@
+# -*- coding:utf8 -*-
+import sys
+reload(sys)
+sys.setdefaultencoding("utf-8")
 import tensorflow as tf
+import tensorflow.contrib as tc
 import layer_utils
 import match_utils
-
+from tensorflow.python.ops import array_ops
 
 class SentenceMatchModelGraph(object):
     def __init__(self, num_classes, word_vocab=None, char_vocab=None, is_training=True, options=None, global_step=None):
@@ -169,8 +174,9 @@ class SentenceMatchModelGraph(object):
         self.prob = tf.nn.softmax(logits)
         
         gold_matrix = tf.one_hot(self.truth, num_classes, dtype=tf.float32)
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=gold_matrix))
-
+        #self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=gold_matrix))
+        self.loss = tf.reduce_mean(self.focal_loss(labels=self.truth, logits=self.prob))
+        #self.loss = tf.reduce_mean(tf.losses.hinge_loss(labels=self.truth, logits=self.prob))
         correct = tf.nn.in_top_k(logits, self.truth, 1)
         self.eval_correct = tf.reduce_sum(tf.cast(correct, tf.int32))
         self.predictions = tf.argmax(self.prob, 1)
@@ -200,3 +206,64 @@ class SentenceMatchModelGraph(object):
             train_ops = [self.train_op, variables_averages_op]
             self.train_op = tf.group(*train_ops)
 
+    def focal_loss(self, labels, logits, gamma=2.0, alpha=4.0):
+        """
+        focal loss for multi-classification
+        FL(p_t)=-alpha(1-p_t)^{gamma}ln(p_t)
+        Notice: logits is probability after softmax
+        gradient is d(Fl)/d(p_t) not d(Fl)/d(x) as described in paper
+        d(Fl)/d(p_t) * [p_t(1-p_t)] = d(Fl)/d(x)
+        Lin, T.-Y., Goyal, P., Girshick, R., He, K., & Dollár, P. (2017).
+        Focal Loss for Dense Object Detection, 130(4), 485–491.
+        https://doi.org/10.1016/j.ajodo.2005.02.022
+        :param labels: ground truth labels, shape of [batch_size]
+        :param logits: model's output, shape of [batch_size, num_cls]
+        :param gamma:
+        :param alpha:
+        :return: shape of [batch_size]
+        """
+        epsilon = 1.e-9
+        labels = tf.to_int64(labels)
+        labels = tf.convert_to_tensor(labels, tf.int64)
+        logits = tf.convert_to_tensor(logits, tf.float32)
+        num_cls = logits.shape[1]
+
+        model_out = tf.add(logits, epsilon)
+        onehot_labels = tf.one_hot(labels, num_cls)
+        ce = tf.multiply(onehot_labels, -tf.log(model_out))
+        weight = tf.multiply(onehot_labels, tf.pow(tf.subtract(1., model_out), gamma))
+        fl = tf.multiply(alpha, tf.multiply(weight, ce))
+        reduced_fl = tf.reduce_max(fl, axis=1)
+        # reduced_fl = tf.reduce_sum(fl, axis=1)  # same as reduce_max
+        return reduced_fl
+
+    def focal_loss2(prediction_tensor, target_tensor, weights=None, alpha=0.25, gamma=2):
+        r"""Compute focal loss for predictions.
+            Multi-labels Focal loss formula:
+                FL = -alpha * (z-p)^gamma * log(p) -(1-alpha) * p^gamma * log(1-p)
+                     ,which alpha = 0.25, gamma = 2, p = sigmoid(x), z = target_tensor.
+        Args:
+         prediction_tensor: A float tensor of shape [batch_size, num_anchors,
+            num_classes] representing the predicted logits for each class
+         target_tensor: A float tensor of shape [batch_size, num_anchors,
+            num_classes] representing one-hot encoded classification targets
+         weights: A float tensor of shape [batch_size, num_anchors]
+         alpha: A scalar tensor for focal loss alpha hyper-parameter
+         gamma: A scalar tensor for focal loss gamma hyper-parameter
+        Returns:
+            loss: A (scalar) tensor representing the value of the loss function
+        """
+        sigmoid_p = tf.nn.sigmoid(prediction_tensor)
+        zeros = array_ops.zeros_like(sigmoid_p, dtype=sigmoid_p.dtype)
+
+        # For poitive prediction, only need consider front part loss, back part is 0;
+        # target_tensor > zeros <=> z=1, so poitive coefficient = z - p.
+        pos_p_sub = array_ops.where(target_tensor > zeros, target_tensor - sigmoid_p, zeros)
+
+        # For negative prediction, only need consider back part loss, front part is 0;
+        # target_tensor > zeros <=> z=1, so negative coefficient = 0.
+        neg_p_sub = array_ops.where(target_tensor > zeros, zeros, sigmoid_p)
+        per_entry_cross_ent = - alpha * (pos_p_sub ** gamma) * tf.log(tf.clip_by_value(sigmoid_p, 1e-8, 1.0)) \
+                              - (1 - alpha) * (neg_p_sub ** gamma) * tf.log(
+            tf.clip_by_value(1.0 - sigmoid_p, 1e-8, 1.0))
+        return tf.reduce_sum(per_entry_cross_ent)

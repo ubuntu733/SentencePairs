@@ -31,7 +31,6 @@ import tensorflow as tf
 import SentenceMatchTrainer
 from SentenceMatchModelGraph import SentenceMatchModelGraph
 from SentenceMatchDataStream import SentenceMatchDataStream
-from preprocess import preprocess_sentence
 import jieba
 
 def build_data(args):
@@ -51,7 +50,7 @@ def build_data(args):
             segment_document2 = [_ for _ in jieba.cut(line_list[2])]
             write_file.write(" ".join(segment_document1) + '\t')
             write_file.write(" ".join(segment_document2) + '\t')
-            write_file.write(preprocess_sentence(line_list[0]) + '\n')
+            write_file.write(line_list[0] + '\n')
 
     write_file.close()
 

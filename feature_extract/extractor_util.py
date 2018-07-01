@@ -33,7 +33,7 @@ def extract_sent_len(sent_1, sent_2, type="word"):
 
     sent_diff = abs(len(sent_1) - len(sent_2))
     sent_len_dict["sent_diff_%s" % type] = sent_diff
-    sent_len_dict["sent_logdiff_%s" % type] = math.log1p(sent_diff )
+    sent_len_dict["sent_logdiff_%s" % type] = math.log1p(sent_diff)
 
     sent_len_dict["sent_ratio_%s" % type] = len(sent_1) * 1.0 / (len(sent_2) + 1e-6)
     sent_len_dict["sent_logratio_%s" % type] = math.log1p(len(sent_1) * 1.0 / (len(sent_2) + 1e-6))

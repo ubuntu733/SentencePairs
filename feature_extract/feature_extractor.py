@@ -8,6 +8,7 @@
 import os
 import sys
 import pickle
+import numpy as np
 from multiprocessing import Pool
 from sklearn.feature_extraction import DictVectorizer
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
@@ -20,6 +21,23 @@ from feature_extract.tf_kdl_weight import TFKLD
 from feature_extract.preprocess import my_tokenizer
 from feature_extract.semantic_feature_extractor import *
 import time
+
+
+def _pickle_method(method):
+    func_name = method.im_func.__name__
+    obj = method.im_self
+    cls = method.im_class
+    return _unpickle_method, (func_name, obj, cls)
+
+def _unpickle_method(func_name, obj, cls):
+    for cls in cls.mro():
+        try:
+            func = cls.__dict__[func_name]
+        except KeyError:
+            pass
+        else:
+            break
+    return func.__get__(obj, cls)
 
 
 class FeatureExtractor(object):
@@ -76,7 +94,7 @@ class FeatureExtractor(object):
         feature_set_dict["tfkdl_sim"] = cal_tfkdl_sim(self.tfkdl_object, self.tfkdl_weight,
                                                       self.tfkdl_counterizer, sent_1, sent_2)
 
-        feature_set_dict["label"] = int(label)
+        feature_set_dict["label"] = label
 
         return feature_set_dict
 
@@ -100,7 +118,6 @@ class FeatureExtractor(object):
                     print("===there have tacked count is===", count)
 
         if process == "train":
-            dict_vectorizer = DictVectorizer(sparse=False)
             return dict_vectorizer, dict_vectorizer.fit_transform(dataset_features)
         else:
             return dataset_features
@@ -110,7 +127,7 @@ class FeatureExtractor(object):
         return self.extract_sentpair_feature(args[0], args[1], args[2])
 
 
-    def extract_corpus_feature_multiprocessing(self, dataset_path, sent_column=[0, 1, 2], process="train", python_v="py3"):
+    def extract_corpus_feature_multiprocessing(self, dataset_path, sent_column=[3, 1, 2], process="train", python_v="py3"):
         """
         :param dataset:list of tuple(sent_1, sent_2--string splited by space)
         :return:list of dict, feature vector matrix(n_samples, n_features)
@@ -122,7 +139,9 @@ class FeatureExtractor(object):
             for line in reader:
                 line = line.decode("utf-8")
                 line_list = line.strip().split("\t")
-                dataset.append((line_list[sent_column[0]], line_list[sent_column[1]], line_list[sent_column[2]]))
+                # 获取后面的line number用来数据的排序，因为多进程顺序乱了
+                line_num = int(unicode(line_list[sent_column[0]]))
+                dataset.append((line_num, line_list[sent_column[1]], line_list[sent_column[2]]))
 
         # TODO python2
         pool = Pool(4)
@@ -135,34 +154,18 @@ class FeatureExtractor(object):
         pool.close()
         pool.join()
 
-        if process == "train":
-            dict_vectorizer = DictVectorizer(sparse=False)
-            return dict_vectorizer, dict_vectorizer.fit_transform(dataset_features)
-        else:
-            return dataset_features
+        print("==========process have tackled ok=============")
+        # 顺序的line num和line的映射关系
+        dataset_lineno_index_mapping = dict(zip([val[0] for val in dataset], range(len(dataset))))
+        # 特征数据的line num
+        dataset_lineno = [feature.pop("label") for feature in dataset_features]
 
+        # 进行数据排序
+        seq_dataset_features = len(dataset_features) * [None]
+        for line_index, lineno in enumerate(dataset_lineno):
+            seq_dataset_features[dataset_lineno_index_mapping[lineno]] = dataset_features[line_index]
 
-def run_corpus_extractor_multiprocessing(class_instance, dataset_path, sent_column=[0, 1 ,2], process="train", python_v="py3"):
-    """
-    """
-
-    return class_instance.extract_corpus_feature_multiprocessing(dataset_path, sent_column, process, python_v)
-
-def _pickle_method(method):
-    func_name = method.im_func.__name__
-    obj = method.im_self
-    cls = method.im_class
-    return _unpickle_method, (func_name, obj, cls)
-
-def _unpickle_method(func_name, obj, cls):
-    for cls in cls.mro():
-        try:
-            func = cls.__dict__[func_name]
-        except KeyError:
-            pass
-        else:
-            break
-    return func.__get__(obj, cls)
+        return seq_dataset_features
 
 
 if __name__ == "__main__":
@@ -172,8 +175,8 @@ if __name__ == "__main__":
 
     model_path_dict = {}
     model_path_dict["tfkdl_param_path"] = os.path.join(parent_dir, "data/m_result/tfkdl_params_train.pickle")
-    model_path_dict["counter_vectorizer_path"] = os.path.join(parent_dir, "data/m_result/train_counter_vectorizer.model")
-    model_path_dict["tfidf_model_path"] = os.path.join(parent_dir, "data/m_result/train_tfidf_vectorizer.model")
+    model_path_dict["counter_vectorizer_path"] = os.path.join(parent_dir, "data/m_result/ngram1.train_counter_vectorizer.model")
+    model_path_dict["tfidf_model_path"] = os.path.join(parent_dir, "data/m_result/ngram1.train_tfidf_vectorizer.model")
 
     """
     # for complete data
@@ -188,27 +191,31 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
+
     train_dataset_path = "../data/ori_data/train_process.csv"
-    dict_vectorizer, dataset_vector = feature_extractor.extract_corpus_feature_multiprocessing(train_dataset_path, python_v="py2")
-    #dict_vectorizer, dataset_vector = run_corpus_extractor_multiprocessing(feature_extractor, train_dataset_path, python_v="py2")
-    pickle.dump(dict_vectorizer, open("../data/m_result/dict_vectorizer.model.t", "wb"), 2)
-    pickle.dump(dataset_vector, open("../data/ori_data/train.featurematrix.data.t", "wb"), 2)
+    train_dataset_features = feature_extractor.extract_corpus_feature_multiprocessing(train_dataset_path, python_v="py2")
+
+    dict_vectorizer = DictVectorizer(sparse=False)
+    train_dataset_vector = dict_vectorizer.fit_transform(train_dataset_features)
+
+    pickle.dump(dict_vectorizer, open("../data/m_result/ngram1_dict_vectorizer.model", "wb"), 2)
+    pickle.dump(train_dataset_vector, open("../data/ori_data/ngram1.train.featurematrix.data", "wb"), 2)
+
     print(dict_vectorizer.feature_names_)
-    print(dataset_vector[:1])
-    print("===========dataset shape================", dataset_vector.shape)
+    print(train_dataset_vector[:1])
+    print("===========dataset shape================", train_dataset_vector.shape)
     print("===time using is ===", time.time() - start_time)
 
     """
     """
 
-    dict_vectorizer = pickle.load(open("../data/m_result/dict_vectorizer.model.t", "rb"))
+    dict_vectorizer = pickle.load(open("../data/m_result/ngram1_dict_vectorizer.model", "rb"))
 
     dev_dataset_path = "../data/ori_data/dev_process.csv"
     dev_dataset_features = feature_extractor.extract_corpus_feature_multiprocessing(dev_dataset_path, process="dev", python_v="py2")
-    #dev_dataset_features = run_corpus_extractor_multiprocessing(feature_extractor, train_dataset_path, python_v="py2")
     dev_dataset_vector = dict_vectorizer.transform(dev_dataset_features)
 
-    pickle.dump(dev_dataset_vector, open("../data/ori_data/dev.featurematrix.data.t", "wb"), 2)
+    pickle.dump(dev_dataset_vector, open("../data/ori_data/ngram1.dev.featurematrix.data", "wb"), 2)
     print("===========dev dataset shape================", dev_dataset_vector.shape)
 
     """

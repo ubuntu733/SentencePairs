@@ -1,0 +1,2 @@
+model_checkpoint_path: "/aispeech/shenchengen/SentencePairs/alibaba/logs8/SentenceMatch.alibaba.best.model"
+all_model_checkpoint_paths: "/aispeech/shenchengen/SentencePairs/alibaba/logs8/SentenceMatch.alibaba.best.model"

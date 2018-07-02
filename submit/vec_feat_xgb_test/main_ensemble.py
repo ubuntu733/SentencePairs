@@ -97,17 +97,17 @@ def get_dl_preds(inpath, outputname="dl_preds.txt"):
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     output_path = os.path.join(cur_dir, outputname)
 
-    os.system("python test.py --in_path %s \
-            --word_vec_path alibaba/logs8/fasttext.txt.vec \
+    os.system("python ./test.py --in_path %s \
+            --word_vec_path ./alibaba/logs8/fasttext.txt.vec \
             --out_path %s \
-            --model_prefix alibaba/logs8/SentenceMatch.alibaba" %(inpath, output_path))
+            --model_prefix ./alibaba/logs8/SentenceMatch.alibaba" %(inpath, output_path))
 
     pred_result = []
     with open(output_path, "r") as reader:
         for line in reader:
-            line_num, prob_1, prob_0 = line.strip().split("\t")
-            pred_result.append([float(unicode(prob_1)),
-                                float(unicode(prob_0))])
+            line_num, label_, prob_0, prob_1 = line.strip().split("\t")
+            pred_result.append([float(unicode(prob_0)),
+                                float(unicode(prob_1))])
     return np.array(pred_result)
 
 
@@ -158,7 +158,7 @@ def get_dlembedding_preds(extracted_features, dl_embedding):
     :return:
     """
     dl_emb_preds_list = []
-    return np.array(dl_emb_preds_list)
+    return np.zeros((1, 2))
 
 
 def get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec, sent_number_list,
@@ -175,7 +175,7 @@ def get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec, sent_nu
     :return:
     """
     mix_preds_list = []
-    return mix_preds_list
+    return np.zeros((1, 2))
 
 
 def make_ensemble_prob(tfidf_model_preds_list, dlemb_model_pred_list,
@@ -260,11 +260,14 @@ def process(inpath, outpath):
     # 获取预测结果
     tfidf_model_preds_list = get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list,
                     counter_vectorizer, tfidf_vectorizer, pca)
+
     dlemb_model_pred_list = get_dlembedding_preds(dataset_feature_vector,
-                                                  dlembedding=dl_embedding)
+                                                  dl_embedding=dl_embedding)
     mix_vec_model_preds_list = get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec, sent_number_list,
                     counter_vectorizer, tfidf_vectorizer, pca)
+
     dl_model_preds = get_dl_preds(inpath)
+
     with open(outpath, "w") as fout:
         # 做ensemble, num_example
         ensemble_results = make_ensemble_prob(tfidf_model_preds_list, dlemb_model_pred_list,

@@ -38,14 +38,18 @@ def _unpickle_method(func_name, obj, cls):
     return func.__get__(obj, cls)
 
 
-def make_matrix(tfidf_vector, sent_num_list):
+def make_matrix(tfidf_vector, sent_num_list, id_lineno_mapping):
     """
     :param tfidf_vector
     :param sent_num_list
+    :param id_lineno_mapping
     """
     dataset_matrix = []
     for example_num in sent_num_list:
-        sent_1_num = 2 * (example_num - 1)
+
+        lineno = id_lineno_mapping[example_num]
+
+        sent_1_num = 2 * (lineno)
         sent_2_num = sent_1_num + 1
 
         sent_1_vector = tfidf_vector[sent_1_num]
@@ -111,13 +115,14 @@ def get_dl_preds(inpath, outputname="dl_preds.txt"):
     return np.array(pred_result)
 
 
-def get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list,
+def get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list, id_lineno_mapping,
                     counter_vectorizer, tfidf_vectorizer, pca):
     """
      获取基于TFIDF向量模型的预测结果
     :param dataset_feature_vector:
     :param dataset_for_vec:
     :param sent_number_list:
+    :param id_lineno_mapping
     :param counter_vectorizer:
     :param tfidf_vectorizer:
     :param pca:
@@ -130,10 +135,13 @@ def get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list,
     tfidf_vector = tfidf_vectorizer.transform(counter_vector)
     # dimension reduction
     pca_tfidf_vector = pca.transform(tfidf_vector)
-    tfidf_matrix = make_matrix(pca_tfidf_vector, sent_number_list)
+
+    tfidf_matrix = make_matrix(pca_tfidf_vector, sent_number_list, id_lineno_mapping)
 
     # feature and tfidf vector concat
     dataset_feature_vector = np.concatenate((tfidf_matrix, dataset_feature_vector), axis=1)
+
+    seq_lineno_list = [id_lineno_mapping[id_sent] for id_sent in sent_number_list]
 
     model_name_list = ["tfidf_featured.xgb.model"]
     model_preds_list = []
@@ -144,7 +152,7 @@ def get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list,
         # 获取预测的概率, num_example * num_class
         pred_scores = model.predict_proba(dataset_feature_vector)
         order_pred_scores = np.array([val for _, val in
-                                      sorted(zip(sent_number_list, pred_scores), key=lambda x: x[0])])
+                                      sorted(zip(seq_lineno_list, pred_scores), key=lambda x: x[0])])
         model_preds_list.append(order_pred_scores)
 
     return model_preds_list
@@ -189,9 +197,9 @@ def make_ensemble_prob(tfidf_model_preds_list, dlemb_model_pred_list,
     :return:
     """
     # make element-wise add
-    sum_probas = dlemb_model_pred_list
+    sum_probas = 0.7 * dlemb_model_pred_list
     for preds in tfidf_model_preds_list:
-        sum_probas = np.add(sum_probas, preds)
+        sum_probas = np.add(sum_probas, 0.3 * preds)
     for preds in dlemb_model_pred_list:
         sum_probas = np.add(sum_probas, preds)
     for preds in mix_vec_model_preds_list:
@@ -213,10 +221,10 @@ def make_ensemble_count(tfidf_model_preds_list, dlemb_model_pred_list,
     sum_count = np.argmax(dlemb_model_pred_list, axis=1)
     for preds in tfidf_model_preds_list:
         sum_count = np.add(sum_count, np.argmax(preds, axis=1))
-    for preds in dlemb_model_pred_list:
-        sum_count = np.add(sum_count, np.argmax(preds, axis=1))
-    for preds in mix_vec_model_preds_list:
-        sum_count = np.add(sum_count, np.argmax(preds, axis=1))
+    #for preds in dlemb_model_pred_list:
+    #    sum_count = np.add(sum_count, np.argmax(preds, axis=1))
+    #for preds in mix_vec_model_preds_list:
+    #    sum_count = np.add(sum_count, np.argmax(preds, axis=1))
 
     total_model_count = len(tfidf_model_preds_list) + len(dlemb_model_pred_list) + \
                   len(mix_vec_model_preds_list) + 1
@@ -230,6 +238,9 @@ def process(inpath, outpath):
     :param outpath:
     :return:
     """
+    # 获取DL model的预测结果
+    dl_model_preds = get_dl_preds(inpath)
+
     counter_vectorizer, tfidf_vectorizer, feature_dictvectorizer, \
         pca, feature_extractor_obj = load_model()
 
@@ -251,6 +262,9 @@ def process(inpath, outpath):
     # the extracted feature
     dataset_featureset = feature_extractor_obj.extract_corpus_feature_multiprocessing(dataset,
                                                                                       process="dev", python_v="py2")
+    # id和lineno的映射关系
+    id_lineno_mapping = dict(zip([val[0] for val in dataset], range(len(dataset))))
+
     sent_number_list = [int(featureset.pop("label", None)) for featureset in dataset_featureset]
     dataset_feature_vector = feature_dictvectorizer.transform(dataset_featureset)
 
@@ -258,7 +272,7 @@ def process(inpath, outpath):
     dl_embedding = []
 
     # 获取预测结果
-    tfidf_model_preds_list = get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list,
+    tfidf_model_preds_list = get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list,id_lineno_mapping,
                     counter_vectorizer, tfidf_vectorizer, pca)
 
     dlemb_model_pred_list = get_dlembedding_preds(dataset_feature_vector,
@@ -266,20 +280,24 @@ def process(inpath, outpath):
     mix_vec_model_preds_list = get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec, sent_number_list,
                     counter_vectorizer, tfidf_vectorizer, pca)
 
-    dl_model_preds = get_dl_preds(inpath)
 
     with open(outpath, "w") as fout:
         # 做ensemble, num_example
-        ensemble_results = make_ensemble_prob(tfidf_model_preds_list, dlemb_model_pred_list,
-                                         mix_vec_model_preds_list, dl_model_preds)
+        #ensemble_results = make_ensemble_prob(tfidf_model_preds_list, dlemb_model_pred_list,
+        #                                 mix_vec_model_preds_list, dl_model_preds)
 
-        #ensemble_results = make_ensemble_count(tfidf_model_preds_list, dlemb_model_pred_list,
-        #                                      mix_vec_model_preds_list, dl_model_preds)
+        ensemble_results = make_ensemble_count(tfidf_model_preds_list, dlemb_model_pred_list,
+                                              mix_vec_model_preds_list, dl_model_preds)
 
         for lineno, pred_result in enumerate(ensemble_results):
             fout.write(str(lineno + 1) + '\t%s\n' %(str(pred_result)))
-
+            """
+            if pred_result[0] > pred_result[1]:
+                fout.write(str(lineno + 1) + '\t%s\n' %(str(0)))
+            else:
+                fout.write(str(lineno + 1) + '\t%s\n' %(str(1)))
+            """
 
 if __name__ == '__main__':
-    process(sys.argv[1], sys.argv[2])
-    #process("./data/data_test.txt", "./test_pred")
+    #process(sys.argv[1], sys.argv[2])
+    process("./data/data_test.txt", "./test_pred")

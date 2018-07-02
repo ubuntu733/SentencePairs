@@ -13,7 +13,12 @@ from multiprocessing import Pool
 from sklearn.feature_extraction import DictVectorizer
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
-import copy_reg
+PY_ENV = "py3"
+
+if PY_ENV == "py2":
+    import copy_reg
+else:
+    import copyreg as copy_reg
 from types import MethodType
 
 from feature_extract.extractor_util import *
@@ -140,7 +145,11 @@ class FeatureExtractor(object):
                 line = line.decode("utf-8")
                 line_list = line.strip().split("\t")
                 # 获取后面的line number用来数据的排序，因为多进程顺序乱了
-                line_num = int(unicode(line_list[sent_column[0]]))
+                if PY_ENV == "py2":
+                    line_num = int(unicode(line_list[sent_column[0]]))
+                else:
+                    line_num = int(line_list[sent_column[0]])
+
                 dataset.append((line_num, line_list[sent_column[1]], line_list[sent_column[2]]))
 
         # TODO python2
@@ -174,9 +183,14 @@ if __name__ == "__main__":
     parent_dir = os.path.dirname(os.path.abspath(__file__)) + "/../"
 
     model_path_dict = {}
+    """
     model_path_dict["tfkdl_param_path"] = os.path.join(parent_dir, "data/m_result/tfkdl_params_train.pickle")
     model_path_dict["counter_vectorizer_path"] = os.path.join(parent_dir, "data/m_result/ngram1.train_counter_vectorizer.model")
     model_path_dict["tfidf_model_path"] = os.path.join(parent_dir, "data/m_result/ngram1.train_tfidf_vectorizer.model")
+    """
+    model_path_dict["tfkdl_param_path"] = os.path.join(parent_dir, "data/m_result/tfkdl_params_train_hmm.pickle")
+    model_path_dict["counter_vectorizer_path"] = os.path.join(parent_dir, "data/m_result/ngram1.hmm.train_counter_vectorizer.model")
+    model_path_dict["tfidf_model_path"] = os.path.join(parent_dir, "data/m_result/ngram1.hmm.train_tfidf_vectorizer.model")
 
     """
     # for complete data
@@ -192,14 +206,14 @@ if __name__ == "__main__":
     start_time = time.time()
 
 
-    train_dataset_path = "../data/ori_data/train_process.csv"
-    train_dataset_features = feature_extractor.extract_corpus_feature_multiprocessing(train_dataset_path, python_v="py2")
+    train_dataset_path = "../data/ori_data/train_process_hmm.csv"
+    train_dataset_features = feature_extractor.extract_corpus_feature_multiprocessing(train_dataset_path)
 
     dict_vectorizer = DictVectorizer(sparse=False)
     train_dataset_vector = dict_vectorizer.fit_transform(train_dataset_features)
 
-    pickle.dump(dict_vectorizer, open("../data/m_result/ngram1_dict_vectorizer.model", "wb"), 2)
-    pickle.dump(train_dataset_vector, open("../data/ori_data/ngram1.train.featurematrix.data", "wb"), 2)
+    pickle.dump(dict_vectorizer, open("../data/m_result/ngram1_hmm_dict_vectorizer.model", "wb"), 2)
+    pickle.dump(train_dataset_vector, open("../data/ori_data/ngram1.hmm.train.featurematrix.data", "wb"), 2)
 
     print(dict_vectorizer.feature_names_)
     print(train_dataset_vector[:1])
@@ -209,13 +223,13 @@ if __name__ == "__main__":
     """
     """
 
-    dict_vectorizer = pickle.load(open("../data/m_result/ngram1_dict_vectorizer.model", "rb"))
+    dict_vectorizer = pickle.load(open("../data/m_result/ngram1_hmm_dict_vectorizer.model", "rb"))
 
-    dev_dataset_path = "../data/ori_data/dev_process.csv"
-    dev_dataset_features = feature_extractor.extract_corpus_feature_multiprocessing(dev_dataset_path, process="dev", python_v="py2")
+    dev_dataset_path = "../data/ori_data/dev_process_hmm.csv"
+    dev_dataset_features = feature_extractor.extract_corpus_feature_multiprocessing(dev_dataset_path, process="dev")
     dev_dataset_vector = dict_vectorizer.transform(dev_dataset_features)
 
-    pickle.dump(dev_dataset_vector, open("../data/ori_data/ngram1.dev.featurematrix.data", "wb"), 2)
+    pickle.dump(dev_dataset_vector, open("../data/ori_data/ngram1.hmm.dev.featurematrix.data", "wb"), 2)
     print("===========dev dataset shape================", dev_dataset_vector.shape)
 
     """

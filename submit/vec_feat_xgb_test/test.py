@@ -18,6 +18,8 @@
 from __future__ import print_function
 import sys
 
+from langconv import Converter
+
 reload(sys)
 sys.setdefaultencoding("utf-8")
 
@@ -33,6 +35,46 @@ from SentenceMatchModelGraph import SentenceMatchModelGraph
 from SentenceMatchDataStream import SentenceMatchDataStream
 import jieba
 
+def change_sentence(sentence):
+    # 去除标点符号
+    sentence = sentence.replace(",", "")
+    sentence = sentence.replace("，", "")
+    sentence = sentence.replace(".", "")
+    sentence = sentence.replace("。", "")
+    sentence = sentence.replace("?", "")
+    sentence = sentence.replace("？", "")
+    sentence = sentence.replace("!", "")
+
+    # 替换某些词语
+    sentence = sentence.replace("借贝", "借呗")
+    sentence = sentence.replace("花贝", "花呗")
+    sentence = sentence.replace('花吧', "花呗")
+    sentence = sentence.replace('借吧', '借呗')
+    sentence = sentence.replace("蚂蚁借呗", "借呗")
+    sentence = sentence.replace("蚂蚁花呗", "花呗")
+    sentence = sentence.replace("蚂蚁花呗", "花呗")
+    sentence = sentence.replace("整么", "怎么")
+    sentence = sentence.replace("冻解", "冻结")
+    sentence = sentence.replace("撤掉", "撤销")
+    sentence = sentence.replace("提额", "提高额度")
+    sentence = sentence.replace("买机票", "订机票")
+    sentence = sentence.replace("什时", "什么时候")
+
+
+    # 将***替换成N
+    sentence = re.sub(r'[*]+', "N", sentence)
+
+    return sentence
+def preprocess_sentence(sentence):
+    '''
+    sentence = re.sub(r'\*+', '', sentence)
+    sentence = re.sub(
+        u"[’!\"#$%&'()*+,-./:;<=>?@，。?★、…【】《》？“”‘’！[\\]^_`{|}~]+", "", sentence
+    )
+    '''
+
+    sentence = Converter('zh-hans').convert(sentence)
+    sentence = change_sentence(sentence)
 def build_data(args):
     write_file = open('test.csv', 'w')
     jieba.load_userdict('alibaba/dict')
@@ -46,8 +88,8 @@ def build_data(args):
             if len(line_list) !=3:
                 print('第{}行数据格式错误'.format(idx+1))
                 raise EOFError
-            segment_document1 = [_ for _ in jieba.cut(line_list[1])]
-            segment_document2 = [_ for _ in jieba.cut(line_list[2])]
+            segment_document1 = [_ for _ in jieba.cut(preprocess_sentence(line_list[1]))]
+            segment_document2 = [_ for _ in jieba.cut(preprocess_sentence(line_list[2]))]
             write_file.write(" ".join(segment_document1) + '\t')
             write_file.write(" ".join(segment_document2) + '\t')
             write_file.write(line_list[0] + '\n')

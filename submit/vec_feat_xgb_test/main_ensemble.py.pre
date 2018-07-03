@@ -38,6 +38,33 @@ def _unpickle_method(func_name, obj, cls):
     return func.__get__(obj, cls)
 
 
+def make_matrix(tfidf_vector, sent_num_list, id_lineno_mapping):
+    """
+    :param tfidf_vector
+    :param sent_num_list
+    :param id_lineno_mapping
+    """
+    dataset_matrix = []
+    for example_num in sent_num_list:
+
+        lineno = id_lineno_mapping[example_num]
+
+        sent_1_num = 2 * (lineno)
+        sent_2_num = sent_1_num + 1
+
+        sent_1_vector = tfidf_vector[sent_1_num]
+        sent_2_vector = tfidf_vector[sent_2_num]
+
+        vector_sum = sent_1_vector + sent_2_vector
+        vector_diff = abs(sent_1_vector - sent_2_vector)
+
+        vector = np.concatenate((vector_sum, vector_diff))
+
+        dataset_matrix.append(vector)
+
+    return dataset_matrix
+
+
 def load_model():
     """
     :return:
@@ -58,17 +85,7 @@ def load_model():
     model_path_dict["counter_vectorizer_path"] = os.path.join(data_dir, counter_vectorizer_name)
     model_path_dict["tfidf_model_path"] = os.path.join(data_dir, tfidf_vectorizer_name)
 
-    # tfidf pca model path
-    model_path_dict["tfidf_pca_path_dict"] = {}
-    for dimension in [50, 100, 150, 200]:
-        pca_path = os.path.join(data_dir, "origin_train_pca_%d.model" % dimension)
-        model_path_dict["tfidf_pca_path_dict"]["%d_dim" % dimension] = pca_path
-
-    # idf dict path
-    model_path_dict["idf_path"] = os.path.join(data_dir,"train.idf.dict")
-
     feature_extractor_obj = FeatureExtractor(model_path_dict)
-
     copy_reg.pickle(MethodType, _pickle_method, _unpickle_method)
 
     return counter_vectorizer, tfidf_vectorizer, feature_dictvectorizer, pca, feature_extractor_obj
@@ -98,12 +115,14 @@ def get_dl_preds(inpath, outputname="dl_preds.txt"):
     return np.array(pred_result)
 
 
-def get_tfidf_preds(dataset_feature_vector, dataset_for_vec, counter_vectorizer,
-                    tfidf_vectorizer, pca):
+def get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list, id_lineno_mapping,
+                    counter_vectorizer, tfidf_vectorizer, pca):
     """
      获取基于TFIDF向量模型的预测结果
     :param dataset_feature_vector:
     :param dataset_for_vec:
+    :param sent_number_list:
+    :param id_lineno_mapping
     :param counter_vectorizer:
     :param tfidf_vectorizer:
     :param pca:
@@ -117,18 +136,24 @@ def get_tfidf_preds(dataset_feature_vector, dataset_for_vec, counter_vectorizer,
     # dimension reduction
     pca_tfidf_vector = pca.transform(tfidf_vector)
 
+    tfidf_matrix = make_matrix(pca_tfidf_vector, sent_number_list, id_lineno_mapping)
+
     # feature and tfidf vector concat
-    dataset_feature_vector = np.concatenate((pca_tfidf_vector, dataset_feature_vector), axis=1)
+    dataset_feature_vector = np.concatenate((tfidf_matrix, dataset_feature_vector), axis=1)
+
+    seq_lineno_list = [id_lineno_mapping[id_sent] for id_sent in sent_number_list]
 
     model_name_list = ["tfidf_featured.xgb.model"]
     model_preds_list = []
     for model_name in model_name_list:
 
         model = pickle.load(open(os.path.join(data_dir, model_name), "rb"))
+
         # 获取预测的概率, num_example * num_class
         pred_scores = model.predict_proba(dataset_feature_vector)
-
-        model_preds_list.append(pred_scores)
+        order_pred_scores = np.array([val for _, val in
+                                      sorted(zip(seq_lineno_list, pred_scores), key=lambda x: x[0])])
+        model_preds_list.append(order_pred_scores)
 
     return model_preds_list
 
@@ -144,13 +169,14 @@ def get_dlembedding_preds(extracted_features, dl_embedding):
     return np.zeros((1, 2))
 
 
-def get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec,
+def get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec, sent_number_list,
                     counter_vectorizer, tfidf_vectorizer, pca):
     """
     获取基于DL embedding和TFIDF拼接向量的预测结果
     :param dataset_feature_vector:
     :param dl_embedding:
     :param dataset_for_vec:
+    :param sent_number_list:
     :param counter_vectorizer:
     :param tfidf_vectorizer:
     :param pca:
@@ -240,21 +266,25 @@ def process(inpath, outpath):
             dataset_for_vec.append(sent1)
             dataset_for_vec.append(sent2)
 
-    # the extracted feature， 顺序和文件的中的排列顺序是一致的
+    # the extracted feature
     dataset_featureset = feature_extractor_obj.extract_corpus_feature_multiprocessing(dataset,
                                                                                       process="dev", python_v="py2")
+    # id和lineno的映射关系
+    id_lineno_mapping = dict(zip([val[0] for val in dataset], range(len(dataset))))
+
+    sent_number_list = [int(featureset.pop("label", None)) for featureset in dataset_featureset]
     dataset_feature_vector = feature_dictvectorizer.transform(dataset_featureset)
 
     # 获取DL embedding
     dl_embedding = []
 
     # 获取预测结果
-    tfidf_model_preds_list = get_tfidf_preds(dataset_feature_vector, dataset_for_vec,
+    tfidf_model_preds_list = get_tfidf_preds(dataset_feature_vector, dataset_for_vec, sent_number_list,id_lineno_mapping,
                     counter_vectorizer, tfidf_vectorizer, pca)
 
     dlemb_model_pred_list = get_dlembedding_preds(dataset_feature_vector,
                                                   dl_embedding=dl_embedding)
-    mix_vec_model_preds_list = get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec,
+    mix_vec_model_preds_list = get_mix_preds(dataset_feature_vector, dl_embedding, dataset_for_vec, sent_number_list,
                     counter_vectorizer, tfidf_vectorizer, pca)
 
 

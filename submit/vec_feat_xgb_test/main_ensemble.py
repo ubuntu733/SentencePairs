@@ -218,7 +218,10 @@ def make_ensemble_count(tfidf_model_preds_list, dlemb_model_pred_list,
     :param dl_model_preds:
     :return:
     """
-    sum_count = np.argmax(dlemb_model_pred_list, axis=1)
+    sum_count = np.argmax(dl_model_preds, axis=1)
+
+    print(sum_count)
+
     for preds in tfidf_model_preds_list:
         sum_count = np.add(sum_count, np.argmax(preds, axis=1))
     #for preds in dlemb_model_pred_list:
@@ -228,6 +231,10 @@ def make_ensemble_count(tfidf_model_preds_list, dlemb_model_pred_list,
 
     total_model_count = len(tfidf_model_preds_list) + len(dlemb_model_pred_list) + \
                   len(mix_vec_model_preds_list) + 1
+
+
+    total_model_count = 2
+    print("=====total count =======", total_model_count // 2)
 
     return (sum_count >= (total_model_count // 2)).astype(int)
 
@@ -299,5 +306,5 @@ def process(inpath, outpath):
             """
 
 if __name__ == '__main__':
-    #process(sys.argv[1], sys.argv[2])
-    process("./data/data_test.txt", "./test_pred")
+    process(sys.argv[1], sys.argv[2])
+    #process("./data/data_test.txt", "./test_pred")

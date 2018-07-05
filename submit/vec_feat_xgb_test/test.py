@@ -88,8 +88,8 @@ def build_data(args):
             if len(line_list) !=3:
                 print('第{}行数据格式错误'.format(idx+1))
                 raise EOFError
-            segment_document1 = [_ for _ in jieba.cut(line_list[1])]
-            segment_document2 = [_ for _ in jieba.cut(line_list[2])]
+            segment_document1 = [_ for _ in jieba.cut(preprocess_sentence(line_list[1]))]
+            segment_document2 = [_ for _ in jieba.cut(preprocess_sentence(line_list[2]))]
             write_file.write(" ".join(segment_document1) + '\t')
             write_file.write(" ".join(segment_document2) + '\t')
             write_file.write(line_list[0] + '\n')

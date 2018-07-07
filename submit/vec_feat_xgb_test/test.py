@@ -75,6 +75,8 @@ def preprocess_sentence(sentence):
 
     sentence = Converter('zh-hans').convert(sentence)
     sentence = change_sentence(sentence)
+    return sentence
+
 def build_data(args):
     write_file = open('test.csv', 'w')
     jieba.load_userdict('alibaba/dict')
